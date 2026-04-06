@@ -1,18 +1,19 @@
+from datetime import date
 import random
 from typing import Dict, List
 
-from src.risposta_menu import Risposta
+from src.risposta_menu import Pasti, Pasti_settimana, Risposta
 from src.piatto import Piatto
 from src.enums import Giorni_settimana, Proteina, Stagione, Tipologia
 from src.richiesta_menu import Richiesta
 
-frequenza_macro = Dict[Proteina, int] = {
+frequenza_macro : Dict[Proteina, int] = {
     Proteina.LEGUMI: 3,        # Es: Lunedì pranzo, Mercoledì cena, Venerdì pranzo
-    Proteina.LATTICINI: 2,     # Es: Martedì cena, Sabato pranzo
-    Proteina.CARNE_BIANCA: 3,  # Es: Lunedì cena, Giovedì pranzo, Sabato cena
+    Proteina.LATTICINI: 4,     # Es: Martedì cena, Sabato pranzo
+    Proteina.CARNE_BIANCA: 4,  # Es: Lunedì cena, Giovedì pranzo, Sabato cena
     Proteina.CARNE_ROSSA: 1,   # Es: Domenica pranzo
     Proteina.PESCE: 3,         # Es: Martedì pranzo, Venerdì cena, Domenica cena
-    Proteina.UOVA: 2           # Es: Mercoledì pranzo, Giovedì cena
+    Proteina.UOVA: 3           # Es: Mercoledì pranzo, Giovedì cena
 }
 
 db: List[Piatto] = [
@@ -48,21 +49,8 @@ db: List[Piatto] = [
     Piatto(id=30, nome="Zuppa di farro e lenticchie", tempo=40, adatto_al_lavoro=True, proteina=Proteina.LEGUMI, tipologia=Tipologia.UNICO, stagione=Stagione.INVERNO),
 ]
 
-def genera_piano_settimanale(richiesta: Richiesta) -> Risposta:
-    
-    import random
-from datetime import date
-from typing import List, Dict, Optional
-
-def genera_menu_ordinato(
-    richiesta: Richiesta, 
-    db: List[Piatto], 
-    frequenza_macro: Dict[Proteina, int]
-) -> Risposta:
-    
-    # --- PUNTO 1: Filtrare il DB ---
-    # Includiamo sempre Stagione.GENERICO e filtriamo per tempo_massimo
-    db_filtrato = [
+def filtro_db(richiesta)-> List[Piatto]:
+    return [
         p for p in db 
         if p.tempo <= richiesta.tempo_massimo and (
             richiesta.stagioni is None or 
@@ -71,19 +59,38 @@ def genera_menu_ordinato(
         )
     ]
 
-    # --- PUNTO 2: Crea pool di proteine (Shuffle) ---
-    # Creiamo una lista di 14 elementi basata sulle frequenze desiderate
-    ##### DA RAFFINARE IN UN SEGONDO MOMENTO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    pool_proteine = []
-    for prot, limite_massimo in frequenza_macro.items():
-        pool_proteine.extend([prot] * limite_massimo)
+def genera_pool_proteine_garantito() -> List[Proteina]:
+    totale_target: int = 14
+    # 1. Identifichiamo tutte le proteine che hanno almeno un pasto richiesto
+    proteine_richieste = [p for p, qta in frequenza_macro.items() if qta > 0]
     
-    # Assicuriamoci che il pool sia esattamente di 14 (o gestiamo il resto)
-    random.shuffle(pool_proteine)
+    # 2. Garanzia: Inseriamo una unità per ogni proteina nel pool finale
+    # Questo assicura che nessuna proteina vada a zero
+    pool_finale = list(proteine_richieste)
+    
+    # 3. Creiamo un pool di "avanzi" (tutte le istanze rimanenti oltre la prima già presa)
+    rimanenti_pool = []
+    for p, qta in frequenza_macro.items():
+        # Sottraiamo 1 perché l'abbiamo già messa in pool_finale
+        istanze_extra = qta - 1
+        if istanze_extra > 0:
+            rimanenti_pool.extend([p] * istanze_extra)
+    
+    # 4. Calcoliamo quanti pasti mancano per arrivare a 14
+    posti_da_riempire = totale_target - len(pool_finale)
+    
+    if posti_da_riempire > 0:
+        # Peschiamo casualmente dal pool degli avanzi senza ripetere lo stesso oggetto
+        # (random.sample garantisce che non superiamo il limite massimo di ogni proteina)
+        extra_estratti = random.sample(rimanenti_pool, k=min(posti_da_riempire, len(rimanenti_pool)))
+        pool_finale.extend(extra_estratti)
+    
+    # 5. Shuffle finale per alternare le fonti durante la settimana
+    random.shuffle(pool_finale)
+    
+    return pool_finale
 
-    # --- PUNTO 3: Assegnazione piatti e gestione giorni lavorativi ---
-    
-    def seleziona_piatto_da_pool(proteina_target: Proteina, vincolo_lavoro: bool) -> Piatto:
+def seleziona_piatto_da_pool(proteina_target: Proteina, vincolo_lavoro: bool, db_filtrato: List[Piatto]) -> Piatto:
         # Cerchiamo i piatti che corrispondono alla proteina del pool
         candidati = [p for p in db_filtrato if p.proteina == proteina_target]
         
@@ -102,6 +109,11 @@ def genera_menu_ordinato(
             
         return random.choice(candidati)
 
+def genera_menu_ordinato(richiesta: Richiesta) -> Risposta:
+    
+    db_filtrato = filtro_db(richiesta)
+    pool_proteine = genera_pool_proteine_garantito()
+    
     # Costruiamo la tabella giorno per giorno
     risultati_giornalieri = {}
     ordine_giorni = ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato", "domenica"]
@@ -119,8 +131,8 @@ def genera_menu_ordinato(
 
         # Creazione oggetto Pasti (usando le tue classi)
         risultati_giornalieri[nome_giorno] = Pasti(
-            pranzo=[seleziona_piatto_da_pool(prot_pranzo, is_lavorativo)],
-            cena=[seleziona_piatto_da_pool(prot_cena, False)]
+            pranzo=[seleziona_piatto_da_pool(prot_pranzo, is_lavorativo, db_filtrato)],
+            cena=[seleziona_piatto_da_pool(prot_cena, False, db_filtrato)]
         )
 
     # --- COSTRUZIONE RISPOSTA FINALE ---
@@ -134,9 +146,3 @@ def genera_menu_ordinato(
         data_inizio_settimana=dt_inizio,
         tabella=tabella
     )
-
-
-
-
-def crea_menu (richiesta: Richiesta) -> Risposta:
-    

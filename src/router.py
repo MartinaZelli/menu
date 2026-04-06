@@ -3,6 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, FastAPI
 from pydantic import BaseModel
 
+from src.risposta_menu import Risposta
 import src.service
 from src.richiesta_menu import Richiesta
 from src.enums import Proteina, Stagione, Tipologia
@@ -14,14 +15,12 @@ router = APIRouter(
 )
 
 db = src.service.db
+frequenza_macro = src.service.frequenza_macro
 
 @router.get("")
-async def mostra_piatti(filtro: Richiesta = Depends())->List[Piatto]:
-    risultato = db
-    if filtro.stagioni:
-        risultato = [p for p in risultato if p.stagione in filtro.stagioni  ]
-    if filtro.tempo_massimo:
-        risultato = [p for p in risultato if p.tempo <= filtro.tempo_massimo]
+async def mostra_piatti(richiesta: Richiesta = Depends())->Risposta:
+    risultato = src.service.genera_menu_ordinato(richiesta)
+    
     
     return risultato
    

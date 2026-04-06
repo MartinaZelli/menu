@@ -7,8 +7,8 @@ from src.piatto import Piatto
 from src.enums import Giorni_settimana
 
 class Pasti(BaseModel):
-    pranzo = List[Piatto]
-    cena = List[Piatto]
+    pranzo : List[Piatto] = []
+    cena : List[Piatto] = []
 
 class Pasti_settimana(BaseModel):
     lunedi: Pasti
