@@ -76,37 +76,33 @@
         // Imposta la data di oggi come default nell'input
         document.getElementById('data_inizio').valueAsDate = new Date();
 
-        async function generaMenu() {
-            const stagione = document.getElementById('stagione').value;
-            const tempo = document.getElementById('tempo').value;
-            const dataInizio = document.getElementById('data_inizio').value;
-            
-            const loading = document.getElementById('loading');
-            const tbody = document.getElementById('menu-body');
-            
-            loading.style.display = 'block';
-            tbody.innerHTML = '';
+   async function generaMenu() {
+    const stagione = document.getElementById('stagione').value;
+    const tempo = document.getElementById('tempo').value;
+    const dataInizio = document.getElementById('data_inizio').value;
+    
+    // Qui raccoglierai i pasti bloccati (per ora inizializziamo lista vuota)
+    const pastiBloccati = []; 
 
-            try {
-                // COSTRUZIONE URL CON PARAMETRI
-                // Esempio: /menu?stagioni=estate&tempo_massimo=30&data_inizio_settimana=2026-04-22
-                let url = `/menu?tempo_massimo=${tempo}&data_inizio_settimana=${dataInizio}`;
-                
-                // Aggiungiamo la stagione solo se non è "generico"
-                if (stagione !== "generico") {
-                    url += `&stagioni=${stagione}`;
-                }
+    const corpoRichiesta = {
+        stagioni: stagione !== "generico" ? [stagione] : null,
+        tempo_massimo: parseInt(tempo),
+        data_inizio_settimana: dataInizio,
+        pasti_bloccati: pastiBloccati
+    };
 
-                const response = await fetch(url);
-                const data = await response.json();
-                renderTable(data.tabella);
-            } catch (error) {
-                alert("Errore nella generazione del menu. Controlla il terminale Python!");
-                console.error(error);
-            } finally {
-                loading.style.display = 'none';
-            }
-        }
+    try {
+        const response = await fetch('/menu', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(corpoRichiesta)
+        });
+        const data = await response.json();
+        renderTable(data.tabella);
+    } catch (error) {
+        console.error("Errore:", error);
+    }
+}
 
         function renderTable(tabella) {
             const giorni = ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato", "domenica"];

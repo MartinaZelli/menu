@@ -17,11 +17,9 @@ router = APIRouter(
 db = src.service.db
 frequenza_macro = src.service.frequenza_macro
 
-@router.get("")
-async def mostra_piatti(richiesta: Richiesta = Depends())->Risposta:
+@router.post("") # Cambiato da .get a .post
+async def genera_menu(richiesta: Richiesta) -> Risposta: # Rimosso Depends
     risultato = src.service.genera_menu_ordinato(richiesta)
-    
-    
     return risultato
    
 

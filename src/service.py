@@ -139,6 +139,84 @@ def seleziona_piatto_da_pool(
     return random.choice(candidati)
 
 def genera_menu_ordinato(richiesta: Richiesta) -> Risposta:
+    # 1. Prepariamo i dati base
+    db_filtrato = filtro_db(richiesta)
+    pasti_bloccati = richiesta.pasti_bloccati or []
+    
+    # 2. Mappa per capire subito se un pasto (es. lunedi_pranzo) è bloccato
+    mappa_bloccati = {f"{pb.giorno}_{pb.momento}": pb.piatto for pb in pasti_bloccati}
+    
+    # 3. Aggiorniamo le frequenze: sottraiamo le proteine già scelte manualmente
+    frequenza_residua = frequenza_macro.copy()
+    for pb in pasti_bloccati:
+        if pb.piatto.proteina in frequenza_residua:
+            frequenza_residua[pb.piatto.proteina] -= 1
+
+    # 4. Generiamo il pool solo per i posti rimasti (14 totali meno i bloccati)
+    pool_proteine = genera_pool_proteine_garantito(frequenza_residua, 14 - len(pasti_bloccati))
+    it_pool = iter(pool_proteine)
+    
+    risultati_giornalieri = {}
+    ordine_giorni = ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato", "domenica"]
+    piatti_usati_ids = []
+    conteggio_proteine = {p: 0 for p in Proteina}
+    piatto_vuoto = Piatto(id=0, nome="Nessun piatto trovato", tempo=0, adatto_al_lavoro=False)
+
+    for nome_giorno in ordine_giorni:
+        enum_giorno = Giorni_settimana[nome_giorno.upper()]
+        is_lavorativo = enum_giorno in richiesta.giorni_lavorativi
+        pasti_del_giorno = {"pranzo": [], "cena": []}
+
+        for momento in ["pranzo", "cena"]:
+            chiave = f"{nome_giorno}_{momento}"
+            
+            # --- CASO A: IL PASTO È STATO SCELTO DALL'UTENTE ---
+            if chiave in mappa_bloccati:
+                piatto = mappa_bloccati[chiave]
+                pasti_del_giorno[momento] = [piatto]
+                piatti_usati_ids.append(piatto.id)
+                if piatto.proteina:
+                    conteggio_proteine[piatto.proteina] += 1
+            
+            # --- CASO B: GENERAZIONE AUTOMATICA ---
+            else:
+                prot_target = next(it_pool, None)
+                
+                # Verifichiamo se possiamo ancora usare questa proteina
+                if prot_target and conteggio_proteine[prot_target] < frequenza_macro.get(prot_target, 0):
+                    piatto = seleziona_piatto_da_pool(
+                        prot_target, 
+                        (momento == "pranzo" and is_lavorativo), 
+                        db_filtrato, 
+                        piatti_usati_ids
+                    )
+                    
+                    if piatto:
+                        pasti_del_giorno[momento] = [piatto]
+                        piatti_usati_ids.append(piatto.id)
+                        conteggio_proteine[prot_target] += 1
+                    else:
+                        pasti_del_giorno[momento] = [piatto_vuoto]
+                else:
+                    pasti_del_giorno[momento] = [piatto_vuoto]
+
+        risultati_giornalieri[nome_giorno] = Pasti(
+            pranzo=pasti_del_giorno["pranzo"],
+            cena=pasti_del_giorno["cena"]
+        )
+
+    # 5. Costruzione risposta finale
+    tabella = Pasti_settimana(**risultati_giornalieri)
+    dt_inizio = richiesta.data_inizio_settimana or date.today()
+    giorno_sett_inizio = list(Giorni_settimana)[dt_inizio.weekday()]
+
+    return Risposta(
+        giorno_inizio_settimana=giorno_sett_inizio,
+        data_inizio_settimana=dt_inizio,
+        tabella=tabella
+    )
+'''
+def genera_menu_ordinato(richiesta: Richiesta) -> Risposta:
     db_filtrato = filtro_db(richiesta)
     pool_proteine = genera_pool_proteine_garantito()
     
@@ -191,3 +269,4 @@ def genera_menu_ordinato(richiesta: Richiesta) -> Risposta:
         data_inizio_settimana=dt_inizio,
         tabella=tabella
     )
+    '''
