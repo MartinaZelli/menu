@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configura il tuo Menu</title>
+    <style>
+        :root { --primary: #2c3e50; --bg: #f4f7f6; --accent: #3498db; --white: #ffffff; }
+        body { font-family: sans-serif; background: var(--bg); padding: 20px; color: var(--primary); }
+        
+        /* Stile per i Filtri */
+        .filter-section {
+            max-width: 1200px; margin: 0 auto 20px auto;
+            background: var(--white); padding: 20px;
+            border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end;
+        }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-weight: bold; font-size: 0.9em; }
+        select, input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { 
+            background: var(--accent); color: white; border: none; 
+            padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;
+        }
+        button:hover { opacity: 0.9; }
+
+        /* Tabella (Stili precedenti) */
+        .menu-container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 8px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        th, td { padding: 12px; border: 1px solid #ddd; text-align: center; }
+        th { background: var(--primary); color: white; }
+        .piatto-card { text-align: left; border-left: 3px solid var(--accent); padding: 5px; margin-top: 5px; font-size: 0.85em; }
+    </style>
+</head>
+<body>
+
+    <div class="filter-section">
+        <div class="filter-group">
+            <label>Stagione</label>
+            <select id="stagione">
+                <option value="generico">Qualsiasi</option>
+                <option value="estate">Estate</option>
+                <option value="inverno">Inverno</option>
+                <option value="mezza stagione">Mezza Stagione</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label>Tempo Max (min)</label>
+            <input type="number" id="tempo" value="30" min="5" max="120">
+        </div>
+
+        <div class="filter-group">
+            <label>Data Inizio</label>
+            <input type="date" id="data_inizio">
+        </div>
+
+        <button onclick="generaMenu()">Genera Menu</button>
+    </div>
+
+    <div id="loading" style="display:none; text-align:center;">Generazione in corso...</div>
+
+    <div class="menu-container" id="container">
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 80px;">Pasto</th>
+                    <th>Lun</th> <th>Mar</th> <th>Mer</th> <th>Gio</th> <th>Ven</th> <th>Sab</th> <th>Dom</th>
+                </tr>
+            </thead>
+            <tbody id="menu-body"></tbody>
+        </table>
+    </div>
+
+    <script>
+        // Imposta la data di oggi come default nell'input
+        document.getElementById('data_inizio').valueAsDate = new Date();
+
+        async function generaMenu() {
+            const stagione = document.getElementById('stagione').value;
+            const tempo = document.getElementById('tempo').value;
+            const dataInizio = document.getElementById('data_inizio').value;
+            
+            const loading = document.getElementById('loading');
+            const tbody = document.getElementById('menu-body');
+            
+            loading.style.display = 'block';
+            tbody.innerHTML = '';
+
+            try {
+                // COSTRUZIONE URL CON PARAMETRI
+                // Esempio: /menu?stagioni=estate&tempo_massimo=30&data_inizio_settimana=2026-04-22
+                let url = `/menu?tempo_massimo=${tempo}&data_inizio_settimana=${dataInizio}`;
+                
+                // Aggiungiamo la stagione solo se non è "generico"
+                if (stagione !== "generico") {
+                    url += `&stagioni=${stagione}`;
+                }
+
+                const response = await fetch(url);
+                const data = await response.json();
+                renderTable(data.tabella);
+            } catch (error) {
+                alert("Errore nella generazione del menu. Controlla il terminale Python!");
+                console.error(error);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        function renderTable(tabella) {
+            const giorni = ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato", "domenica"];
+            const tbody = document.getElementById('menu-body');
+            
+            let rigaPranzo = `<tr><td><strong>Pranzo</strong></td>`;
+            let rigaCena = `<tr><td><strong>Cena</strong></td>`;
+
+            giorni.forEach(g => {
+                const pasti = tabella[g];
+                rigaPranzo += `<td>${pasti.pranzo.map(p => `<div class="piatto-card"><strong>${p.nome}</strong><br><small>${p.tempo} min</small></div>`).join('')}</td>`;
+                rigaCena += `<td>${pasti.cena.map(p => `<div class="piatto-card"><strong>${p.nome}</strong><br><small>${p.tempo} min</small></div>`).join('')}</td>`;
+            });
+
+            tbody.innerHTML = rigaPranzo + "</tr>" + rigaCena + "</tr>";
+            
+        }
+        
+        // Carica un menu iniziale all'apertura
+        generaMenu();
+    </script>
+</body>
+</html>

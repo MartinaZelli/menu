@@ -1,6 +1,6 @@
 from datetime import date
 import random
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from src.risposta_menu import Pasti, Pasti_settimana, Risposta
 from src.piatto import Piatto
@@ -17,36 +17,59 @@ frequenza_macro : Dict[Proteina, int] = {
 }
 
 db: List[Piatto] = [
+    # --- LATTICINI (6 piatti) ---
     Piatto(id=1, nome="Pasta al pomodoro e mozzarella", tempo=30, adatto_al_lavoro=False, proteina=Proteina.LATTICINI, tipologia=Tipologia.PRIMO),
     Piatto(id=2, nome="Tomino alla piastra", tempo=5, adatto_al_lavoro=True, proteina=Proteina.LATTICINI, tipologia=Tipologia.SECONDO),
-    Piatto(id=3, nome="Minestrone di verdure", tempo=40, adatto_al_lavoro=False, proteina=Proteina.LEGUMI, tipologia=Tipologia.PRIMO, stagione=Stagione.INVERNO),
-    Piatto(id=4, nome="Hamburger di pollo", tempo=10, adatto_al_lavoro=True, proteina=Proteina.CARNE_BIANCA, tipologia=Tipologia.SECONDO),
-    Piatto(id=5, nome="Insalata di ceci e tonno", tempo=10, adatto_al_lavoro=True, proteina=Proteina.LEGUMI, tipologia=Tipologia.UNICO, stagione=Stagione.ESTATE),
-    Piatto(id=6, nome="Risotto ai funghi", tempo=25, adatto_al_lavoro=False, proteina=None, tipologia=Tipologia.PRIMO, stagione=Stagione.INVERNO),
-    Piatto(id=7, nome="Frittata alle erbe", tempo=15, adatto_al_lavoro=True, proteina=Proteina.UOVA, tipologia=Tipologia.SECONDO),
-    Piatto(id=8, nome="Salmone al vapore", tempo=15, adatto_al_lavoro=True, proteina=Proteina.PESCE, tipologia=Tipologia.SECONDO),
-    Piatto(id=9, nome="Pasta alla carbonara", tempo=20, adatto_al_lavoro=False, proteina=Proteina.UOVA, tipologia=Tipologia.PRIMO),
-    Piatto(id=10, nome="Spezzatino di manzo", tempo=90, adatto_al_lavoro=False, proteina=Proteina.CARNE_ROSSA, tipologia=Tipologia.SECONDO, stagione=Stagione.INVERNO),
-    Piatto(id=11, nome="Lenticchie in umido", tempo=45, adatto_al_lavoro=True, proteina=Proteina.LEGUMI, tipologia=Tipologia.SECONDO, stagione=Stagione.INVERNO),
     Piatto(id=12, nome="Insalata greca", tempo=10, adatto_al_lavoro=True, proteina=Proteina.LATTICINI, tipologia=Tipologia.UNICO, stagione=Stagione.ESTATE),
-    Piatto(id=13, nome="Straccetti di vitello", tempo=10, adatto_al_lavoro=True, proteina=Proteina.CARNE_ROSSA, tipologia=Tipologia.SECONDO),
-    Piatto(id=14, nome="Pasta integrale alle zucchine", tempo=20, adatto_al_lavoro=True, proteina=None, tipologia=Tipologia.PRIMO, stagione=Stagione.MEZZA),
-    Piatto(id=15, nome="Baccalà alla livornese", tempo=40, adatto_al_lavoro=False, proteina=Proteina.PESCE, tipologia=Tipologia.SECONDO),
+    Piatto(id=20, nome="Gnocchi al gorgonzola", tempo=15, adatto_al_lavoro=False, proteina=Proteina.LATTICINI, tipologia=Tipologia.PRIMO, stagione=Stagione.INVERNO),
+    Piatto(id=22, nome="Pasta fredda tricolore", tempo=20, adatto_al_lavoro=True, proteina=Proteina.LATTICINI, tipologia=Tipologia.PRIMO, stagione=Stagione.ESTATE),
+    Piatto(id=31, nome="Ricotta fresca e miele", tempo=5, adatto_al_lavoro=True, proteina=Proteina.LATTICINI, tipologia=Tipologia.SECONDO, stagione=Stagione.ESTATE),
+
+    # --- LEGUMI (9 piatti) ---
+    Piatto(id=3, nome="Minestrone di verdure", tempo=40, adatto_al_lavoro=False, proteina=Proteina.LEGUMI, tipologia=Tipologia.PRIMO, stagione=Stagione.INVERNO),
+    Piatto(id=5, nome="Insalata di ceci e tonno", tempo=10, adatto_al_lavoro=True, proteina=Proteina.LEGUMI, tipologia=Tipologia.UNICO, stagione=Stagione.ESTATE),
+    Piatto(id=11, nome="Lenticchie in umido", tempo=45, adatto_al_lavoro=True, proteina=Proteina.LEGUMI, tipologia=Tipologia.SECONDO, stagione=Stagione.INVERNO),
     Piatto(id=16, nome="Polpette di soia", tempo=20, adatto_al_lavoro=True, proteina=Proteina.LEGUMI, tipologia=Tipologia.SECONDO),
     Piatto(id=17, nome="Quinoa con verdure", tempo=25, adatto_al_lavoro=True, proteina=Proteina.LEGUMI, tipologia=Tipologia.UNICO),
-    Piatto(id=18, nome="Uova in purgatorio", tempo=15, adatto_al_lavoro=False, proteina=Proteina.UOVA, tipologia=Tipologia.SECONDO),
-    Piatto(id=19, nome="Spiedini di tacchino", tempo=15, adatto_al_lavoro=True, proteina=Proteina.CARNE_BIANCA, tipologia=Tipologia.SECONDO),
-    Piatto(id=20, nome="Gnocchi al gorgonzola", tempo=15, adatto_al_lavoro=False, proteina=Proteina.LATTICINI, tipologia=Tipologia.PRIMO, stagione=Stagione.INVERNO),
-    Piatto(id=21, nome="Branzino al sale", tempo=35, adatto_al_lavoro=False, proteina=Proteina.PESCE, tipologia=Tipologia.SECONDO),
-    Piatto(id=22, nome="Pasta fredda tricolore", tempo=20, adatto_al_lavoro=True, proteina=Proteina.LATTICINI, tipologia=Tipologia.PRIMO, stagione=Stagione.ESTATE),
     Piatto(id=23, nome="Fagioli all'uccelletto", tempo=30, adatto_al_lavoro=True, proteina=Proteina.LEGUMI, tipologia=Tipologia.CONTORNO),
-    Piatto(id=24, nome="Bistecca ai ferri", tempo=8, adatto_al_lavoro=False, proteina=Proteina.CARNE_ROSSA, tipologia=Tipologia.SECONDO),
-    Piatto(id=25, nome="Vellutata di zucca", tempo=35, adatto_al_lavoro=True, proteina=None, tipologia=Tipologia.PRIMO, stagione=Stagione.INVERNO),
-    Piatto(id=26, nome="Cous cous di pesce", tempo=30, adatto_al_lavoro=True, proteina=Proteina.PESCE, tipologia=Tipologia.UNICO, stagione=Stagione.ESTATE),
-    Piatto(id=27, nome="Scaloppine al limone", tempo=15, adatto_al_lavoro=True, proteina=Proteina.CARNE_BIANCA, tipologia=Tipologia.SECONDO),
     Piatto(id=28, nome="Hummus con cruditè", tempo=15, adatto_al_lavoro=True, proteina=Proteina.LEGUMI, tipologia=Tipologia.UNICO),
-    Piatto(id=29, nome="Omelette al formaggio", tempo=10, adatto_al_lavoro=False, proteina=Proteina.UOVA, tipologia=Tipologia.SECONDO),
     Piatto(id=30, nome="Zuppa di farro e lenticchie", tempo=40, adatto_al_lavoro=True, proteina=Proteina.LEGUMI, tipologia=Tipologia.UNICO, stagione=Stagione.INVERNO),
+    Piatto(id=32, nome="Zuppa di piselli freschi", tempo=30, adatto_al_lavoro=False, proteina=Proteina.LEGUMI, tipologia=Tipologia.PRIMO, stagione=Stagione.MEZZA),
+
+    # --- CARNE BIANCA (7 piatti) ---
+    Piatto(id=4, nome="Hamburger di pollo", tempo=10, adatto_al_lavoro=True, proteina=Proteina.CARNE_BIANCA, tipologia=Tipologia.SECONDO),
+    Piatto(id=19, nome="Spiedini di tacchino", tempo=15, adatto_al_lavoro=True, proteina=Proteina.CARNE_BIANCA, tipologia=Tipologia.SECONDO),
+    Piatto(id=27, nome="Scaloppine al limone", tempo=15, adatto_al_lavoro=True, proteina=Proteina.CARNE_BIANCA, tipologia=Tipologia.SECONDO),
+    Piatto(id=33, nome="Insalata di pollo e mele", tempo=15, adatto_al_lavoro=True, proteina=Proteina.CARNE_BIANCA, tipologia=Tipologia.UNICO, stagione=Stagione.ESTATE),
+    Piatto(id=34, nome="Pollo al curry", tempo=25, adatto_al_lavoro=True, proteina=Proteina.CARNE_BIANCA, tipologia=Tipologia.SECONDO, stagione=Stagione.INVERNO),
+    Piatto(id=35, nome="Tacchino alle erbe", tempo=15, adatto_al_lavoro=True, proteina=Proteina.CARNE_BIANCA, tipologia=Tipologia.SECONDO, stagione=Stagione.MEZZA),
+    Piatto(id=44, nome="Bocconcini di pollo ai funghi", tempo=20, adatto_al_lavoro=True, proteina=Proteina.CARNE_BIANCA, tipologia=Tipologia.SECONDO, stagione=Stagione.INVERNO),
+
+    # --- CARNE ROSSA (6 piatti) ---
+    Piatto(id=10, nome="Spezzatino di manzo", tempo=90, adatto_al_lavoro=False, proteina=Proteina.CARNE_ROSSA, tipologia=Tipologia.SECONDO, stagione=Stagione.INVERNO),
+    Piatto(id=13, nome="Straccetti di vitello", tempo=10, adatto_al_lavoro=True, proteina=Proteina.CARNE_ROSSA, tipologia=Tipologia.SECONDO),
+    Piatto(id=24, nome="Bistecca ai ferri", tempo=8, adatto_al_lavoro=False, proteina=Proteina.CARNE_ROSSA, tipologia=Tipologia.SECONDO),
+    Piatto(id=36, nome="Polpette al sugo", tempo=35, adatto_al_lavoro=False, proteina=Proteina.CARNE_ROSSA, tipologia=Tipologia.SECONDO, stagione=Stagione.INVERNO),
+    Piatto(id=37, nome="Carpaccio di bresaola", tempo=5, adatto_al_lavoro=True, proteina=Proteina.CARNE_ROSSA, tipologia=Tipologia.SECONDO, stagione=Stagione.ESTATE),
+    Piatto(id=45, nome="Tagliata di manzo e rucola", tempo=12, adatto_al_lavoro=False, proteina=Proteina.CARNE_ROSSA, tipologia=Tipologia.SECONDO, stagione=Stagione.MEZZA),
+
+    # --- PESCE (7 piatti) ---
+    Piatto(id=8, nome="Salmone al vapore", tempo=15, adatto_al_lavoro=True, proteina=Proteina.PESCE, tipologia=Tipologia.SECONDO),
+    Piatto(id=15, nome="Baccalà alla livornese", tempo=40, adatto_al_lavoro=False, proteina=Proteina.PESCE, tipologia=Tipologia.SECONDO),
+    Piatto(id=21, nome="Branzino al sale", tempo=35, adatto_al_lavoro=False, proteina=Proteina.PESCE, tipologia=Tipologia.SECONDO),
+    Piatto(id=26, nome="Cous cous di pesce", tempo=30, adatto_al_lavoro=True, proteina=Proteina.PESCE, tipologia=Tipologia.UNICO, stagione=Stagione.ESTATE),
+    Piatto(id=38, nome="Sogliola alla mugnaia", tempo=10, adatto_al_lavoro=True, proteina=Proteina.PESCE, tipologia=Tipologia.SECONDO, stagione=Stagione.MEZZA),
+    Piatto(id=39, nome="Zuppa di pesce", tempo=50, adatto_al_lavoro=False, proteina=Proteina.PESCE, tipologia=Tipologia.UNICO, stagione=Stagione.INVERNO),
+    Piatto(id=46, nome="Filetto di orata al forno", tempo=20, adatto_al_lavoro=False, proteina=Proteina.PESCE, tipologia=Tipologia.SECONDO),
+
+    # --- UOVA (7 piatti) ---
+    Piatto(id=7, nome="Frittata alle erbe", tempo=15, adatto_al_lavoro=True, proteina=Proteina.UOVA, tipologia=Tipologia.SECONDO),
+    Piatto(id=9, nome="Pasta alla carbonara", tempo=20, adatto_al_lavoro=False, proteina=Proteina.UOVA, tipologia=Tipologia.PRIMO),
+    Piatto(id=18, nome="Uova in purgatorio", tempo=15, adatto_al_lavoro=False, proteina=Proteina.UOVA, tipologia=Tipologia.SECONDO),
+    Piatto(id=29, nome="Omelette al formaggio", tempo=10, adatto_al_lavoro=False, proteina=Proteina.UOVA, tipologia=Tipologia.SECONDO),
+    Piatto(id=40, nome="Uova sode e asparagi", tempo=15, adatto_al_lavoro=True, proteina=Proteina.UOVA, tipologia=Tipologia.SECONDO, stagione=Stagione.MEZZA),
+    Piatto(id=41, nome="Frittata al forno con verdure", tempo=25, adatto_al_lavoro=True, proteina=Proteina.UOVA, tipologia=Tipologia.SECONDO),
+    Piatto(id=47, nome="Uova alla coque con crostini", tempo=8, adatto_al_lavoro=False, proteina=Proteina.UOVA, tipologia=Tipologia.SECONDO),
 ]
 
 def filtro_db(richiesta)-> List[Piatto]:
@@ -90,49 +113,71 @@ def genera_pool_proteine_garantito() -> List[Proteina]:
     
     return pool_finale
 
-def seleziona_piatto_da_pool(proteina_target: Proteina, vincolo_lavoro: bool, db_filtrato: List[Piatto]) -> Piatto:
-        # Cerchiamo i piatti che corrispondono alla proteina del pool
+def seleziona_piatto_da_pool(
+    proteina_target: Proteina, 
+    vincolo_lavoro: bool, 
+    db_filtrato: List[Piatto],
+    piatti_gia_usati: List[int] # Nuova lista per evitare duplicati eccessivi
+) -> Optional[Piatto]:
+    # 1. Cerchiamo i piatti che corrispondono alla proteina del pool e NON sono stati ancora usati
+    candidati = [p for p in db_filtrato if p.proteina == proteina_target and p.id not in piatti_gia_usati]
+    
+    # 2. Se non ci sono piatti nuovi per quella proteina, cerchiamo tra quelli usati 
+    # (ma solo se non abbiamo proprio altra scelta per quella specifica proteina)
+    if not candidati:
         candidati = [p for p in db_filtrato if p.proteina == proteina_target]
-        
-        if vincolo_lavoro:
-            # Filtro stringente: solo piatti adatti al lavoro
-            candidati_lavoro = [p for p in candidati if p.adatto_al_lavoro]
-            # Se esistono piatti specifici per il lavoro li usiamo, 
-            # altrimenti fallback sui candidati generici di quella proteina
-            if candidati_lavoro:
-                candidati = candidati_lavoro
 
-        if not candidati:
-            # Fallback estremo: se non ci sono piatti per quella proteina nel DB filtrato, 
-            # ne cerchiamo uno qualsiasi nel DB filtrato per non rompere l'esecuzione
-            return random.choice(db_filtrato) if db_filtrato else Piatto(id=0, nome="N/A", tempo=0, adatto_al_lavoro=False)
-            
-        return random.choice(candidati)
+    if vincolo_lavoro:
+        candidati_lavoro = [p for p in candidati if p.adatto_al_lavoro]
+        if candidati_lavoro:
+            candidati = candidati_lavoro
+
+    # 3. Se dopo tutti i filtri non abbiamo piatti per questa proteina, restituiamo None
+    if not candidati:
+        return None
+        
+    return random.choice(candidati)
 
 def genera_menu_ordinato(richiesta: Richiesta) -> Risposta:
-    
     db_filtrato = filtro_db(richiesta)
     pool_proteine = genera_pool_proteine_garantito()
     
-    # Costruiamo la tabella giorno per giorno
     risultati_giornalieri = {}
     ordine_giorni = ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato", "domenica"]
-    
-    # Usiamo un iteratore sul pool per prelevare le proteine "in maniera ordinata dallo shuffle"
     it_pool = iter(pool_proteine)
+    
+    # Teniamo traccia degli ID piatti usati e del conteggio proteine
+    piatti_usati_ids = []
+    conteggio_proteine = {p: 0 for p in Proteina}
+    
+    # Messaggio di errore se il DB filtrato è troppo povero
+    piatto_vuoto = Piatto(id=0, nome="Nessun piatto trovato", descrizione="Cambia filtri", tempo=0, adatto_al_lavoro=False)
 
     for nome_giorno in ordine_giorni:
         enum_giorno = Giorni_settimana[nome_giorno.upper()]
         is_lavorativo = enum_giorno in richiesta.giorni_lavorativi
 
-        # Estrazione ordinata dal pool rimescolato
-        prot_pranzo = next(it_pool, None)
-        prot_cena = next(it_pool, None)
+        pasti_del_giorno = {"pranzo": [], "cena": []}
 
-        # Creazione oggetto Pasti (usando le tue classi)
+        for momento in ["pranzo", "cena"]:
+            prot_target = next(it_pool, None)
+            
+            # Verifichiamo se abbiamo già raggiunto il limite per questa proteina
+            if prot_target and conteggio_proteine[prot_target] < frequenza_macro.get(prot_target, 0):
+                piatto = seleziona_piatto_da_pool(prot_target, (momento == "pranzo" and is_lavorativo), db_filtrato, piatti_usati_ids)
+                
+                if piatto:
+                    pasti_del_giorno[momento] = [piatto]
+                    piatti_usati_ids.append(piatto.id)
+                    conteggio_proteine[prot_target] += 1
+                else:
+                    pasti_del_giorno[momento] = [piatto_vuoto]
+            else:
+                pasti_del_giorno[momento] = [piatto_vuoto]
+
         risultati_giornalieri[nome_giorno] = Pasti(
-            pranzo=[seleziona_piatto_da_pool(prot_pranzo, is_lavorativo, db_filtrato)],
-            cena=[seleziona_piatto_da_pool(prot_cena, False, db_filtrato)]
+            pranzo=pasti_del_giorno["pranzo"],
+            cena=pasti_del_giorno["cena"]
         )
 
     # --- COSTRUZIONE RISPOSTA FINALE ---
