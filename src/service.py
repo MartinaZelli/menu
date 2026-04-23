@@ -82,30 +82,29 @@ def filtro_db(richiesta)-> List[Piatto]:
         )
     ]
 
-def genera_pool_proteine_garantito() -> List[Proteina]:
-    totale_target: int = 14
-    # 1. Identifichiamo tutte le proteine che hanno almeno un pasto richiesto
-    proteine_richieste = [p for p, qta in frequenza_macro.items() if qta > 0]
+def genera_pool_proteine_garantito(frequenza: Dict[Proteina, int], totale_target: int) -> List[Proteina]:
+    # 1. Identifichiamo tutte le proteine che hanno almeno un pasto richiesto nella frequenza fornita
+    proteine_richieste = [p for p, qta in frequenza.items() if qta > 0]
     
     # 2. Garanzia: Inseriamo una unità per ogni proteina nel pool finale
-    # Questo assicura che nessuna proteina vada a zero
     pool_finale = list(proteine_richieste)
     
-    # 3. Creiamo un pool di "avanzi" (tutte le istanze rimanenti oltre la prima già presa)
+    # 3. Creiamo un pool di "avanzi" basandoci sulla frequenza passata come argomento
     rimanenti_pool = []
-    for p, qta in frequenza_macro.items():
-        # Sottraiamo 1 perché l'abbiamo già messa in pool_finale
+    for p, qta in frequenza.items():
+        # Sottraiamo 1 perché l'abbiamo già messa in pool_finale (se era richiesta)
         istanze_extra = qta - 1
         if istanze_extra > 0:
             rimanenti_pool.extend([p] * istanze_extra)
     
-    # 4. Calcoliamo quanti pasti mancano per arrivare a 14
+    # 4. Calcoliamo quanti pasti mancano per arrivare al target (es. 14 o meno se ci sono blocchi)
     posti_da_riempire = totale_target - len(pool_finale)
     
     if posti_da_riempire > 0:
-        # Peschiamo casualmente dal pool degli avanzi senza ripetere lo stesso oggetto
-        # (random.sample garantisce che non superiamo il limite massimo di ogni proteina)
-        extra_estratti = random.sample(rimanenti_pool, k=min(posti_da_riempire, len(rimanenti_pool)))
+        # Peschiamo casualmente dal pool degli avanzi
+        # Usiamo min per evitare crash se il pool degli avanzi è più piccolo dei posti liberi
+        k_da_estrarre = min(posti_da_riempire, len(rimanenti_pool))
+        extra_estratti = random.sample(rimanenti_pool, k=k_da_estrarre)
         pool_finale.extend(extra_estratti)
     
     # 5. Shuffle finale per alternare le fonti durante la settimana
@@ -139,27 +138,37 @@ def seleziona_piatto_da_pool(
     return random.choice(candidati)
 
 def genera_menu_ordinato(richiesta: Richiesta) -> Risposta:
-    # 1. Prepariamo i dati base
+    # 1. Filtriamo il database in base a stagione e tempo
     db_filtrato = filtro_db(richiesta)
     pasti_bloccati = richiesta.pasti_bloccati or []
     
-    # 2. Mappa per capire subito se un pasto (es. lunedi_pranzo) è bloccato
+    # 2. Creiamo una mappa per i pasti bloccati (facile accesso durante il loop)
+    # Esempio: {"lunedi_pranzo": Piatto(...)}
     mappa_bloccati = {f"{pb.giorno}_{pb.momento}": pb.piatto for pb in pasti_bloccati}
     
-    # 3. Aggiorniamo le frequenze: sottraiamo le proteine già scelte manualmente
+    # 3. CALCOLO FREQUENZA RESIDUA
+    # Partiamo dalla copia della frequenza ideale (frequenza_macro)
     frequenza_residua = frequenza_macro.copy()
+    
     for pb in pasti_bloccati:
-        if pb.piatto.proteina in frequenza_residua:
-            frequenza_residua[pb.piatto.proteina] -= 1
+        prot = pb.piatto.proteina
+        if prot in frequenza_residua:
+            # Sottraiamo la proteina usata manualmente. 
+            # Usiamo max(0, ...) per evitare che la frequenza diventi negativa 
+            # se l'utente inserisce più piatti di quelli previsti.
+            frequenza_residua[prot] = max(0, frequenza_residua[prot] - 1)
 
-    # 4. Generiamo il pool solo per i posti rimasti (14 totali meno i bloccati)
-    pool_proteine = genera_pool_proteine_garantito(frequenza_residua, 14 - len(pasti_bloccati))
+    # 4. GENERAZIONE POOL PER I POSTI RIMASTI
+    # Calcoliamo quanti pasti dobbiamo ancora generare (14 totali - quelli bloccati)
+    posti_liberi = 14 - len(pasti_bloccati)
+    pool_proteine = genera_pool_proteine_garantito(frequenza_residua, posti_liberi)
     it_pool = iter(pool_proteine)
     
     risultati_giornalieri = {}
     ordine_giorni = ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato", "domenica"]
     piatti_usati_ids = []
-    conteggio_proteine = {p: 0 for p in Proteina}
+    
+    # Usiamo un piatto di fallback se il DB non restituisce nulla
     piatto_vuoto = Piatto(id=0, nome="Nessun piatto trovato", tempo=0, adatto_al_lavoro=False)
 
     for nome_giorno in ordine_giorni:
@@ -170,20 +179,15 @@ def genera_menu_ordinato(richiesta: Richiesta) -> Risposta:
         for momento in ["pranzo", "cena"]:
             chiave = f"{nome_giorno}_{momento}"
             
-            # --- CASO A: IL PASTO È STATO SCELTO DALL'UTENTE ---
             if chiave in mappa_bloccati:
+                # Caso A: Il pasto è bloccato dall'utente
                 piatto = mappa_bloccati[chiave]
                 pasti_del_giorno[momento] = [piatto]
                 piatti_usati_ids.append(piatto.id)
-                if piatto.proteina:
-                    conteggio_proteine[piatto.proteina] += 1
-            
-            # --- CASO B: GENERAZIONE AUTOMATICA ---
             else:
+                # Caso B: Generazione automatica dal pool residuo
                 prot_target = next(it_pool, None)
-                
-                # Verifichiamo se possiamo ancora usare questa proteina
-                if prot_target and conteggio_proteine[prot_target] < frequenza_macro.get(prot_target, 0):
+                if prot_target:
                     piatto = seleziona_piatto_da_pool(
                         prot_target, 
                         (momento == "pranzo" and is_lavorativo), 
@@ -194,7 +198,6 @@ def genera_menu_ordinato(richiesta: Richiesta) -> Risposta:
                     if piatto:
                         pasti_del_giorno[momento] = [piatto]
                         piatti_usati_ids.append(piatto.id)
-                        conteggio_proteine[prot_target] += 1
                     else:
                         pasti_del_giorno[momento] = [piatto_vuoto]
                 else:

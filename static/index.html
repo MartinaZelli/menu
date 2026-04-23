@@ -5,10 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configura il tuo Menu</title>
     <style>
-        :root { --primary: #2c3e50; --bg: #f4f7f6; --accent: #3498db; --white: #ffffff; }
-        body { font-family: sans-serif; background: var(--bg); padding: 20px; color: var(--primary); }
+        :root { 
+            --primary: #2c3e50; --bg: #f4f7f6; --accent: #3498db; --white: #ffffff; 
+            --prot-carne-bianca: #d5f5e3; --prot-carne-rossa: #fadbd8;
+            --prot-pesce: #d6eaf8; --prot-legumi: #fef9e7;
+            --prot-uova: #f5ee8e; --prot-latticini: #ebdef0;
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); padding: 20px; color: var(--primary); }
         
-        /* Stile per i Filtri */
         .filter-section {
             max-width: 1200px; margin: 0 auto 20px auto;
             background: var(--white); padding: 20px;
@@ -18,111 +22,220 @@
         .filter-group { display: flex; flex-direction: column; gap: 5px; }
         label { font-weight: bold; font-size: 0.9em; }
         select, input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        
         button { 
-            background: var(--accent); color: white; border: none; 
-            padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold;
+            background: var(--accent); color: white; border: none; padding: 10px 20px;
+            border-radius: 4px; cursor: pointer; font-weight: bold; transition: opacity 0.2s;
         }
         button:hover { opacity: 0.9; }
 
-        /* Tabella (Stili precedenti) */
-        .menu-container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 8px; overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; min-width: 800px; }
-        th, td { padding: 12px; border: 1px solid #ddd; text-align: center; }
-        th { background: var(--primary); color: white; }
-        .piatto-card { text-align: left; border-left: 3px solid var(--accent); padding: 5px; margin-top: 5px; font-size: 0.85em; }
+        table { width: 100%; max-width: 1200px; margin: 0 auto; border-collapse: collapse; background: var(--white); border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); table-layout: fixed; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; height: 100px; vertical-align: top; }
+        th { background: var(--primary); color: white; font-size: 0.85em; }
+        
+        .cella-pasto { cursor: pointer; transition: transform 0.1s; }
+        .cella-pasto:hover { transform: scale(1.02); z-index: 10; background: #fafafa; }
+        
+        .piatto-card { font-size: 0.85em; height: 100%; display: flex; flex-direction: column; justify-content: center; border-radius: 4px; border: 1px solid transparent; }
+        .bloccato { border: 2px dashed #27ae60 !important; }
+
+        /* Colori Proteine */
+        .color-carne-bianca { background-color: var(--prot-carne-bianca); }
+        .color-carne-rossa { background-color: var(--prot-carne-rossa); }
+        .color-pesce { background-color: var(--prot-pesce); }
+        .color-legumi { background-color: var(--prot-legumi); }
+        .color-uova { background-color: var(--prot-uova); }
+        .color-latticini { background-color: var(--prot-latticini); }
+        
+        #modal-editor {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 1000; width: 300px;
+        }
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 999; backdrop-filter: blur(2px); }
     </style>
 </head>
 <body>
+
+    <h2 style="text-align: center;">📅 Weekly Menu Planner</h2>
 
     <div class="filter-section">
         <div class="filter-group">
             <label>Stagione</label>
             <select id="stagione">
-                <option value="generico">Qualsiasi</option>
+                <option value="generico">Generico</option>
                 <option value="estate">Estate</option>
                 <option value="inverno">Inverno</option>
-                <option value="mezza stagione">Mezza Stagione</option>
             </select>
         </div>
-
         <div class="filter-group">
-            <label>Tempo Max (min)</label>
-            <input type="number" id="tempo" value="30" min="5" max="120">
+            <label>Data Inizio (Lunedì)</label>
+            <input type="date" id="data-inizio" onchange="renderTable()">
         </div>
-
-        <div class="filter-group">
-            <label>Data Inizio</label>
-            <input type="date" id="data_inizio">
-        </div>
-
-        <button onclick="generaMenu()">Genera Menu</button>
+        <button onclick="generaMenu()">✨ Genera Menu Automagico</button>
+        <button onclick="resetMenu()" style="background-color: #e74c3c;">Svuota</button>
     </div>
 
-    <div id="loading" style="display:none; text-align:center;">Generazione in corso...</div>
-
-    <div class="menu-container" id="container">
-        <table>
-            <thead>
-                <tr>
-                    <th style="width: 80px;">Pasto</th>
-                    <th>Lun</th> <th>Mar</th> <th>Mer</th> <th>Gio</th> <th>Ven</th> <th>Sab</th> <th>Dom</th>
-                </tr>
+    <table>
+        <thead id="menu-head">
             </thead>
-            <tbody id="menu-body"></tbody>
-        </table>
+        <tbody id="menu-body">
+            </tbody>
+    </table>
+
+    <div class="overlay" id="overlay" onclick="chiudiEditor()"></div>
+    <div id="modal-editor">
+        <h3 id="modal-titolo" style="margin-top:0">Blocca Pasto</h3>
+        <div class="filter-group" style="margin-bottom: 10px;">
+            <label>Cosa vuoi mangiare?</label>
+            <input type="text" id="edit-nome" placeholder="Es: Salmone al forno">
+        </div>
+        <div class="filter-group" style="margin-bottom: 15px;">
+            <label>Fonte Proteica</label>
+            <select id="edit-proteina">
+                <option value="carne bianca">Carne Bianca</option>
+                <option value="carne rossa">Carne Rossa</option>
+                <option value="legumi">Legumi</option>
+                <option value="pesce">Pesce</option>
+                <option value="uova">Uova</option>
+                <option value="latticini">Latticini</option>
+            </select>
+        </div>
+        <input type="hidden" id="edit-giorno">
+        <input type="hidden" id="edit-momento">
+        <button onclick="salvaPastoManuale()" style="width:100%; margin-bottom:5px">Salva e Blocca</button>
+        <button onclick="rimuoviBlocco()" style="width:100%; background-color: #95a5a6;">Rimuovi Blocco</button>
     </div>
 
     <script>
-        // Imposta la data di oggi come default nell'input
-        document.getElementById('data_inizio').valueAsDate = new Date();
+        let pastiBloccati = [];
+        const GIORNI_KEY = ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato", "domenica"];
+        const GIORNI_NOMI = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"];
 
-   async function generaMenu() {
-    const stagione = document.getElementById('stagione').value;
-    const tempo = document.getElementById('tempo').value;
-    const dataInizio = document.getElementById('data_inizio').value;
-    
-    // Qui raccoglierai i pasti bloccati (per ora inizializziamo lista vuota)
-    const pastiBloccati = []; 
+        window.onload = () => {
+            const oggi = new Date();
+            // Imposta al lunedì della settimana corrente
+            const lunedi = new Date(oggi.setDate(oggi.getDate() - oggi.getDay() + (oggi.getDay() === 0 ? -6 : 1)));
+            document.getElementById('data-inizio').value = lunedi.toISOString().split('T')[0];
+            renderTable();
+        };
 
-    const corpoRichiesta = {
-        stagioni: stagione !== "generico" ? [stagione] : null,
-        tempo_massimo: parseInt(tempo),
-        data_inizio_settimana: dataInizio,
-        pasti_bloccati: pastiBloccati
-    };
+        function getColoreClasse(proteina) {
+            if (!proteina) return "";
+            const p = proteina.toLowerCase().replace(" ", "-");
+            return `color-${p}`;
+        }
 
-    try {
-        const response = await fetch('/menu', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(corpoRichiesta)
-        });
-        const data = await response.json();
-        renderTable(data.tabella);
-    } catch (error) {
-        console.error("Errore:", error);
-    }
-}
-
-        function renderTable(tabella) {
-            const giorni = ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato", "domenica"];
-            const tbody = document.getElementById('menu-body');
+        function renderTable(tabellaDalServer = null) {
+            const dataInizio = new Date(document.getElementById('data-inizio').value);
+            const head = document.getElementById('menu-head');
+            const body = document.getElementById('menu-body');
             
-            let rigaPranzo = `<tr><td><strong>Pranzo</strong></td>`;
-            let rigaCena = `<tr><td><strong>Cena</strong></td>`;
+            // 1. Render Header con Date
+            let rigaHead = `<tr><th style="width:10%">Pasto</th>`;
+            for (let i = 0; i < 7; i++) {
+                let d = new Date(dataInizio);
+                d.setDate(dataInizio.getDate() + i);
+                rigaHead += `<th>${GIORNI_NOMI[i]}<br><span style="font-weight:normal; font-size:0.8em">${d.getDate()}/${d.getMonth()+1}</span></th>`;
+            }
+            head.innerHTML = rigaHead + `</tr>`;
 
-            giorni.forEach(g => {
-                const pasti = tabella[g];
-                rigaPranzo += `<td>${pasti.pranzo.map(p => `<div class="piatto-card"><strong>${p.nome}</strong><br><small>${p.tempo} min</small></div>`).join('')}</td>`;
-                rigaCena += `<td>${pasti.cena.map(p => `<div class="piatto-card"><strong>${p.nome}</strong><br><small>${p.tempo} min</small></div>`).join('')}</td>`;
+            // 2. Render Body
+            body.innerHTML = "";
+            ["pranzo", "cena"].forEach(momento => {
+                let riga = `<tr><td><strong>${momento.toUpperCase()}</strong></td>`;
+                
+                GIORNI_KEY.forEach(giorno => {
+                    const bloccato = pastiBloccati.find(p => p.giorno === giorno && p.momento === momento);
+                    let pasto = bloccato ? bloccato.piatto : (tabellaDalServer ? tabellaDalServer[giorno][momento][0] : null);
+                    
+                    let contenuto = `<span style="color:#ccc; font-size:0.8em">Aggiungi</span>`;
+                    let classeColore = "";
+                    let extraStatus = "";
+
+                    if (pasto && pasto.id !== 0) {
+                        classeColore = getColoreClasse(pasto.proteina);
+                        extraStatus = bloccato ? "bloccato" : "";
+                        contenuto = `<strong>${pasto.nome}</strong><br><em style="font-size:0.8em">${pasto.proteina}</em>`;
+                        if(bloccato) contenuto += `<br><span style="font-size:10px">🔒</span>`;
+                    }
+
+                    riga += `
+                        <td class="cella-pasto" onclick="apriEditor('${giorno}', '${momento}')">
+                            <div class="piatto-card ${classeColore} ${extraStatus}">
+                                ${contenuto}
+                            </div>
+                        </td>`;
+                });
+                body.innerHTML += riga + "</tr>";
+            });
+        }
+
+        function apriEditor(giorno, momento) {
+            document.getElementById('edit-giorno').value = giorno;
+            document.getElementById('edit-momento').value = momento;
+            document.getElementById('modal-titolo').innerText = `${giorno.toUpperCase()} - ${momento.toUpperCase()}`;
+            
+            const esistente = pastiBloccati.find(p => p.giorno === giorno && p.momento === momento);
+            document.getElementById('edit-nome').value = esistente ? esistente.piatto.nome : "";
+            if(esistente) document.getElementById('edit-proteina').value = esistente.piatto.proteina;
+            
+            document.getElementById('modal-editor').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+        }
+
+        function chiudiEditor() {
+            document.getElementById('modal-editor').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+        }
+
+        function salvaPastoManuale() {
+            const giorno = document.getElementById('edit-giorno').value;
+            const momento = document.getElementById('edit-momento').value;
+            const nome = document.getElementById('edit-nome').value;
+            const proteina = document.getElementById('edit-proteina').value;
+
+            if(!nome) return alert("Inserisci un nome!");
+
+            pastiBloccati = pastiBloccati.filter(p => !(p.giorno === giorno && p.momento === momento));
+            pastiBloccati.push({
+                giorno: giorno, momento: momento,
+                piatto: { id: 999, nome: nome, proteina: proteina, tempo: 15, adatto_al_lavoro: true }
             });
 
-            tbody.innerHTML = rigaPranzo + "</tr>" + rigaCena + "</tr>";
-            
+            chiudiEditor();
+            renderTable();
         }
-        
-        // Carica un menu iniziale all'apertura
-        generaMenu();
+
+        function rimuoviBlocco() {
+            const giorno = document.getElementById('edit-giorno').value;
+            const momento = document.getElementById('edit-momento').value;
+            pastiBloccati = pastiBloccati.filter(p => !(p.giorno === giorno && p.momento === momento));
+            chiudiEditor();
+            renderTable();
+        }
+
+        async function generaMenu() {
+            const corpo = {
+                stagioni: [document.getElementById('stagione').value],
+                data_inizio_settimana: document.getElementById('data-inizio').value,
+                pasti_bloccati: pastiBloccati
+            };
+
+            try {
+                const res = await fetch('http://127.0.0.1:8000/menu', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(corpo)
+                });
+                const data = await res.json();
+                renderTable(data.tabella);
+            } catch (e) { alert("Server non raggiungibile!"); }
+        }
+
+        function resetMenu() {
+            pastiBloccati = [];
+            renderTable();
+        }
     </script>
 </body>
 </html>
