@@ -68,6 +68,17 @@
             </select>
         </div>
         <div class="filter-group">
+    <label for="tempo-massimo">Tempo max (minuti):</label>
+    <select id="tempo-massimo">
+        <option value="5">5 min</option>
+        <option value="15">15 min</option>
+        <option value="30">30 min</option>
+        <option value="45">45 min</option>
+        <option value="60">60 min</option>
+        <option value="1000" selected>Senza limite</option>
+    </select>
+</div>
+        <div class="filter-group">
             <label>Data Inizio (Lunedì)</label>
             <input type="date" id="data-inizio" onchange="renderTable()">
         </div>
@@ -126,62 +137,104 @@
         }
 
         function renderTable(tabellaDalServer = null) {
-            const dataInizio = new Date(document.getElementById('data-inizio').value);
-            const head = document.getElementById('menu-head');
-            const body = document.getElementById('menu-body');
+    // Se passiamo una nuova tabella dal server, aggiorniamo il riferimento globale
+    if (tabellaDalServer) {
+        ultimoMenuServer = tabellaDalServer;
+    }
+
+    const dataInizio = new Date(document.getElementById('data-inizio').value);
+    const head = document.getElementById('menu-head');
+    const body = document.getElementById('menu-body');
+    
+    // Header (Date)
+    let rigaHead = `<tr><th style="width:10%">Pasto</th>`;
+    for (let i = 0; i < 7; i++) {
+        let d = new Date(dataInizio);
+        d.setDate(dataInizio.getDate() + i);
+        rigaHead += `<th>${GIORNI_NOMI[i]}<br><span style="font-weight:normal; font-size:0.8em">${d.getDate()}/${d.getMonth()+1}</span></th>`;
+    }
+    head.innerHTML = rigaHead + `</tr>`;
+
+    // Body (Pasti)
+    body.innerHTML = "";
+    ["pranzo", "cena"].forEach(momento => {
+        let riga = `<tr><td><strong>${momento.toUpperCase()}</strong></td>`;
+        
+        GIORNI_KEY.forEach(giorno => {
+            // 1. Cerchiamo se c'è un blocco manuale
+            const bloccato = pastiBloccati.find(p => p.giorno === giorno && p.momento === momento);
             
-            // 1. Render Header con Date
-            let rigaHead = `<tr><th style="width:10%">Pasto</th>`;
-            for (let i = 0; i < 7; i++) {
-                let d = new Date(dataInizio);
-                d.setDate(dataInizio.getDate() + i);
-                rigaHead += `<th>${GIORNI_NOMI[i]}<br><span style="font-weight:normal; font-size:0.8em">${d.getDate()}/${d.getMonth()+1}</span></th>`;
+            // 2. Se non è bloccato, cerchiamo l'ultimo suggerimento del server per quella cella
+            let pasto = null;
+            if (bloccato) {
+                pasto = bloccato.piatto;
+            } else if (ultimoMenuServer && ultimoMenuServer[giorno]) {
+                pasto = ultimoMenuServer[giorno][momento][0];
             }
-            head.innerHTML = rigaHead + `</tr>`;
+            
+            let contenuto = `<span style="color:#ccc; font-size:0.8em">Vuoto</span>`;
+            let classeColore = "";
+            let extraStatus = "";
 
-            // 2. Render Body
-            body.innerHTML = "";
-            ["pranzo", "cena"].forEach(momento => {
-                let riga = `<tr><td><strong>${momento.toUpperCase()}</strong></td>`;
+            if (pasto && pasto.id !== 0) {
+                classeColore = getColoreClasse(pasto.proteina);
+                extraStatus = bloccato ? "bloccato" : "";
                 
-                GIORNI_KEY.forEach(giorno => {
-                    const bloccato = pastiBloccati.find(p => p.giorno === giorno && p.momento === momento);
-                    let pasto = bloccato ? bloccato.piatto : (tabellaDalServer ? tabellaDalServer[giorno][momento][0] : null);
-                    
-                    let contenuto = `<span style="color:#ccc; font-size:0.8em">Aggiungi</span>`;
-                    let classeColore = "";
-                    let extraStatus = "";
+                contenuto = `
+                    <div style="display:flex; flex-direction:column; height:100%; justify-content:space-between;">
+                        <div>
+                            <strong>${pasto.nome}</strong><br>
+                            <em style="font-size:0.8em">${pasto.proteina}</em>
+                        </div>
+                        <div style="font-size:0.75em; margin-top:5px; opacity:0.8;">
+                            ⏱️ ${pasto.tempo} min
+                            ${bloccato ? '<span style="margin-left:5px">🔒</span>' : ''}
+                        </div>
+                    </div>
+                `;
+            }
 
-                    if (pasto && pasto.id !== 0) {
-                        classeColore = getColoreClasse(pasto.proteina);
-                        extraStatus = bloccato ? "bloccato" : "";
-                        contenuto = `<strong>${pasto.nome}</strong><br><em style="font-size:0.8em">${pasto.proteina}</em>`;
-                        if(bloccato) contenuto += `<br><span style="font-size:10px">🔒</span>`;
-                    }
+            riga += `
+                <td class="cella-pasto" onclick="apriEditor('${giorno}', '${momento}')">
+                    <div class="piatto-card ${classeColore} ${extraStatus}">
+                        ${contenuto}
+                    </div>
+                </td>`;
+        });
+        body.innerHTML += riga + "</tr>";
+    });
+}
 
-                    riga += `
-                        <td class="cella-pasto" onclick="apriEditor('${giorno}', '${momento}')">
-                            <div class="piatto-card ${classeColore} ${extraStatus}">
-                                ${contenuto}
-                            </div>
-                        </td>`;
-                });
-                body.innerHTML += riga + "</tr>";
-            });
-        }
+        let ultimoMenuServer = null;
 
-        function apriEditor(giorno, momento) {
-            document.getElementById('edit-giorno').value = giorno;
-            document.getElementById('edit-momento').value = momento;
-            document.getElementById('modal-titolo').innerText = `${giorno.toUpperCase()} - ${momento.toUpperCase()}`;
-            
-            const esistente = pastiBloccati.find(p => p.giorno === giorno && p.momento === momento);
-            document.getElementById('edit-nome').value = esistente ? esistente.piatto.nome : "";
-            if(esistente) document.getElementById('edit-proteina').value = esistente.piatto.proteina;
-            
-            document.getElementById('modal-editor').style.display = 'block';
-            document.getElementById('overlay').style.display = 'block';
-        }
+function apriEditor(giorno, momento) {
+    document.getElementById('edit-giorno').value = giorno;
+    document.getElementById('edit-momento').value = momento;
+    document.getElementById('modal-titolo').innerText = `${giorno.toUpperCase()} - ${momento.toUpperCase()}`;
+    
+    // Cerchiamo se esiste già un blocco
+    const esistente = pastiBloccati.find(p => p.giorno === giorno && p.momento === momento);
+    
+    // Se non c'è un blocco manuale, ma c'è un piatto suggerito dal server, lo pre-carichiamo
+    let piattoSuggerito = null;
+    if (!esistente && ultimoMenuServer) {
+        piattoSuggerito = ultimoMenuServer[giorno][momento][0];
+    }
+
+    if (esistente) {
+        document.getElementById('edit-nome').value = esistente.piatto.nome;
+        document.getElementById('edit-proteina').value = esistente.piatto.proteina;
+    } else if (piattoSuggerito && piattoSuggerito.id !== 0) {
+        // Suggeriamo il piatto attualmente visibile per bloccarlo velocemente
+        document.getElementById('edit-nome').value = piattoSuggerito.nome;
+        document.getElementById('edit-proteina').value = piattoSuggerito.proteina;
+    } else {
+        document.getElementById('edit-nome').value = "";
+    }
+    
+    document.getElementById('modal-editor').style.display = 'block';
+    document.getElementById('overlay').style.display = 'block';
+}
 
         function chiudiEditor() {
             document.getElementById('modal-editor').style.display = 'none';
@@ -214,23 +267,29 @@
             renderTable();
         }
 
-        async function generaMenu() {
-            const corpo = {
-                stagioni: [document.getElementById('stagione').value],
-                data_inizio_settimana: document.getElementById('data-inizio').value,
-                pasti_bloccati: pastiBloccati
-            };
+    async function generaMenu() {
+    const tempoSelezionato = document.getElementById('tempo-massimo').value;
+    
+    const corpo = {
+        stagioni: [document.getElementById('stagione').value],
+        tempo_massimo: parseInt(tempoSelezionato),
+        data_inizio_settimana: document.getElementById('data-inizio').value,
+        pasti_bloccati: pastiBloccati // Invia i blocchi attuali
+    };
 
-            try {
-                const res = await fetch('http://127.0.0.1:8000/menu', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(corpo)
-                });
-                const data = await res.json();
-                renderTable(data.tabella);
-            } catch (e) { alert("Server non raggiungibile!"); }
-        }
+    try {
+        const res = await fetch('http://127.0.0.1:8000/menu', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(corpo)
+        });
+        const data = await res.json();
+        ultimoMenuServer = data.tabella; // Salviamo il menu per futuri blocchi
+        renderTable(data.tabella);
+    } catch (e) { 
+        alert("Server non raggiungibile!"); 
+    }
+}
 
         function resetMenu() {
             pastiBloccati = [];
