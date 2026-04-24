@@ -40,6 +40,7 @@ class PastoSalvatoDB(Base):
     giorno = Column(String)  # lunedi, martedi...
     momento = Column(String) # pranzo, cena
     piatto_id = Column(Integer, ForeignKey("piatti.id"))
+    nome_manuale = Column(String, nullable=True) # <--- AGGIUNGI QUESTA RIGA
     
     settimana = relationship("SettimanaDB", back_populates="pasti")
     piatto = relationship("PiattoDB")

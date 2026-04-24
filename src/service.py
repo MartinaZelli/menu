@@ -2,8 +2,8 @@ import random
 from datetime import date
 from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
-
-from src.database import SessionLocal, PiattoDB, MacroDB
+from sqlalchemy import delete
+from src.database import SessionLocal, PiattoDB, MacroDB, SettimanaDB, PastoSalvatoDB
 from src.risposta_menu import Pasti, Pasti_settimana, Risposta
 from src.piatto import Piatto
 from src.enums import Giorni_settimana, Proteina, Stagione, Tipologia
@@ -143,5 +143,53 @@ def genera_menu_ordinato(richiesta: Richiesta) -> Risposta:
             data_inizio_settimana=dt_inizio,
             tabella=Pasti_settimana(**risultati_giornalieri)
         )
+    finally:
+        db_session.close()
+
+def salva_menu_settimanale(richiesta: Risposta) -> bool:
+    db_session = SessionLocal()
+    try:
+        # 1. Controlliamo se esiste già una settimana per questa data
+        settimana_esistente = db_session.query(SettimanaDB).filter(
+            SettimanaDB.data_inizio == richiesta.data_inizio_settimana
+        ).first()
+
+        if settimana_esistente:
+            # Sovrascrittura: cancelliamo i pasti esistenti legati a questa settimana
+            db_session.query(PastoSalvatoDB).filter(
+                PastoSalvatoDB.settimana_id == settimana_esistente.id
+            ).delete()
+            nuova_settimana = settimana_esistente
+        else:
+            # Creazione nuova
+            nuova_settimana = SettimanaDB(data_inizio=richiesta.data_inizio_settimana)
+            db_session.add(nuova_settimana)
+            db_session.flush() # Otteniamo l'ID
+
+        # 2. Salvataggio dei pasti della tabella
+        tabella = richiesta.tabella
+        giorni = ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato", "domenica"]
+        
+        for giorno in giorni:
+            pasti_giorno = getattr(tabella, giorno)
+            for momento in ["pranzo", "cena"]:
+                lista_piatti = getattr(pasti_giorno, momento)
+                for p in lista_piatti:
+                    # Se il piatto ha ID 999 è un inserimento manuale, salviamo il nome
+                    nuovo_pasto = PastoSalvatoDB(
+                        settimana_id=nuova_settimana.id,
+                        giorno=giorno,
+                        momento=momento,
+                        piatto_id=p.id if p.id != 999 else None,
+                        nome_manuale=p.nome if p.id == 999 else None
+                    )
+                    db_session.add(nuovo_pasto)
+        
+        db_session.commit()
+        return True
+    except Exception as e:
+        print(f"Errore durante il salvataggio: {e}")
+        db_session.rollback()
+        return False
     finally:
         db_session.close()

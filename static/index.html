@@ -46,6 +46,37 @@
         .color-legumi { background-color: var(--prot-legumi); }
         .color-uova { background-color: var(--prot-uova); }
         .color-latticini { background-color: var(--prot-latticini); }
+
+        .lock-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: white;
+    border-radius: 4px; /* Leggermente squadrato per occupare meno spazio */
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.75em;
+    border: 1px solid #ddd;
+    z-index: 10;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Aggiungiamo un padding a destra della card per "fare spazio" al lucchetto */
+.piatto-card {
+    position: relative;
+    padding-right: 25px !important; /* Sposta il testo a sinistra di 25px */
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.lock-btn:hover { background: #fff; transform: scale(1.1); }
+.cella-pasto { position: relative; } /* Necessario per posizionare il lucchetto */
         
         #modal-editor {
             display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -82,7 +113,10 @@
             <label>Data Inizio (Lunedì)</label>
             <input type="date" id="data-inizio" onchange="renderTable()">
         </div>
-        <button onclick="generaMenu()">✨ Genera Menu Automagico</button>
+        <button onclick="generaMenu()">✨ Genera Menu </button>
+        <button onclick="accettaESalvaMenu()" class="btn-accetta">
+    ✅ Accetta e Salva nel Database
+</button>
         <button onclick="resetMenu()" style="background-color: #e74c3c;">Svuota</button>
     </div>
 
@@ -195,11 +229,18 @@
             }
 
             riga += `
-                <td class="cella-pasto" onclick="apriEditor('${giorno}', '${momento}')">
-                    <div class="piatto-card ${classeColore} ${extraStatus}">
-                        ${contenuto}
-                    </div>
-                </td>`;
+    <td class="cella-pasto" onclick="apriEditor('${giorno}', '${momento}')">
+        <div class="piatto-card ${classeColore} ${extraStatus}">
+            
+            ${(pasto && pasto.id !== 0) ? `
+                <div class="lock-btn" onclick="toggleBlocco(event, '${giorno}', '${momento}')" title="Blocca/Sblocca">
+                    ${bloccato ? '🔒' : '🔓'}
+                </div>
+            ` : ''}
+
+            ${contenuto}
+        </div>
+    </td>`;
         });
         body.innerHTML += riga + "</tr>";
     });
@@ -267,6 +308,59 @@ function apriEditor(giorno, momento) {
             renderTable();
         }
 
+        function toggleBlocco(event, giorno, momento) {
+    event.stopPropagation(); // Impedisce l'apertura dell'editor modale al click
+
+    const esistenteIndex = pastiBloccati.findIndex(p => p.giorno === giorno && p.momento === momento);
+
+    if (esistenteIndex !== -1) {
+        // Se è già bloccato, lo sblocchiamo
+        pastiBloccati.splice(esistenteIndex, 1);
+    } else if (ultimoMenuServer && ultimoMenuServer[giorno]) {
+        // Se non è bloccato, prendiamo il piatto suggerito dal server e lo blocchiamo
+        const piattoDaBloccare = ultimoMenuServer[giorno][momento][0];
+        
+        if (piattoDaBloccare && piattoDaBloccare.id !== 0) {
+            pastiBloccati.push({
+                giorno: giorno,
+                momento: momento,
+                piatto: piattoDaBloccare
+            });
+        }
+    }
+    renderTable(); // Aggiorna la vista
+}
+
+    async function accettaESalvaMenu() {
+    if (!ultimoMenuServer) {
+        alert("Genera prima un menu per poterlo salvare!");
+        return;
+    }
+
+    // Usiamo l'ultimo menu visualizzato (che include i tuoi blocchi/modifiche)
+    const payload = {
+        data_inizio_settimana: document.getElementById('data-inizio').value,
+        tabella: ultimoMenuServer 
+    };
+
+    try {
+        const response = await fetch('http://127.0.0.1:8000/menu/salva', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.ok) {
+            alert("Ottimo! Il menu è stato salvato (o aggiornato) nel database.");
+        } else {
+            alert("Errore nel salvataggio. Controlla il server.");
+        }
+    } catch (error) {
+        console.error(error);
+        alert("Errore di connessione al server.");
+    }
+}
+
     async function generaMenu() {
     const tempoSelezionato = document.getElementById('tempo-massimo').value;
     
@@ -295,6 +389,37 @@ function apriEditor(giorno, momento) {
             pastiBloccati = [];
             renderTable();
         }
+
+        async function accettaMenu() {
+    if (!ultimoMenuServer && pastiBloccati.length === 0) {
+        alert("Non c'è nessun menu da salvare!");
+        return;
+    }
+
+    // Costruiamo l'oggetto da inviare (formato Risposta)
+    const menuDaSalvare = {
+        data_inizio_settimana: document.getElementById('data-inizio').value,
+        tabella: ultimoMenuServer // Usiamo l'ultima tabella generata/modificata
+    };
+
+    try {
+        const res = await fetch('http://127.0.0.1:8000/menu/salva', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(menuDaSalvare)
+        });
+        
+        if (res.ok) {
+            alert("Menu salvato correttamente nel database!");
+        } else {
+            const err = await res.json();
+            alert("Errore durante il salvataggio: " + err.detail);
+        }
+    } catch (e) {
+        alert("Impossibile connettersi al server.");
+    }
+    
+}
     </script>
 </body>
 </html>
