@@ -1,52 +1,53 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey, Date, Table
+import os
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, ForeignKey, Date
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 
-# Creazione del file unico (verrà creato automaticamente)
-DATABASE_URL = "sqlite:///./menu_progetto.db"
+# Configurazione diretta per MySQL (User: menu, Pass: menu, Host: db)
+DATABASE_URL = "mysql+pymysql://menu:menu@db/menu_progetto"
 Base = declarative_base()
 
 # --- TABELLA MACRO ---
 class MacroDB(Base):
     __tablename__ = "macro"
     id = Column(Integer, primary_key=True, index=True)
-    proteina = Column(String, unique=True) # Es: "carne bianca"
-    frequenza = Column(Integer)            # Es: 4
+    # MySQL richiede una lunghezza per le colonne UNIQUE
+    proteina = Column(String(50), unique=True) 
+    frequenza = Column(Integer)
 
 # --- TABELLA PIATTO ---
 class PiattoDB(Base):
     __tablename__ = "piatti"
     id = Column(Integer, primary_key=True, index=True)
-    nome = Column(String)
-    proteina = Column(String)
-    stagione = Column(String)
+    nome = Column(String(255))
+    proteina = Column(String(50))
+    stagione = Column(String(50))
     tempo = Column(Integer)
     adatto_al_lavoro = Column(Boolean)
-    tipologia = Column(String)
+    tipologia = Column(String(50))
 
 # --- TABELLA TOTALE (Settimana) ---
 class SettimanaDB(Base):
     __tablename__ = "settimane"
     id = Column(Integer, primary_key=True, index=True)
     data_inizio = Column(Date, unique=True)
-    # Relazione con i singoli pasti salvati
     pasti = relationship("PastoSalvatoDB", back_populates="settimana")
 
-# --- TABELLA D'APPOGGIO PER I PASTI DEL MENU ---
+# --- TABELLA PASTI SALVATI ---
 class PastoSalvatoDB(Base):
     __tablename__ = "pasti_salvati"
     id = Column(Integer, primary_key=True, index=True)
     settimana_id = Column(Integer, ForeignKey("settimane.id"))
-    giorno = Column(String)  # lunedi, martedi...
-    momento = Column(String) # pranzo, cena
+    giorno = Column(String(20)) 
+    momento = Column(String(20))
     piatto_id = Column(Integer, ForeignKey("piatti.id"))
-    nome_manuale = Column(String, nullable=True) # <--- AGGIUNGI QUESTA RIGA
+    nome_manuale = Column(String(255), nullable=True)
     
     settimana = relationship("SettimanaDB", back_populates="pasti")
     piatto = relationship("PiattoDB")
 
 # Setup finale
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
