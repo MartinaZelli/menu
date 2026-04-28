@@ -2,194 +2,157 @@ import random
 from datetime import date
 from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import delete
 from src.database import SessionLocal, PiattoDB, MacroDB, SettimanaDB, PastoSalvatoDB
 from src.risposta_menu import Pasti, Pasti_settimana, Risposta
 from src.piatto import Piatto
-from src.enums import Giorni_settimana, Proteina, Stagione, Tipologia
+from src.enums import Proteina, Stagione, Tipologia
 from src.richiesta_menu import Richiesta
 
-def genera_pool_proteine_garantito(frequenza: Dict[str, int], totale_target: int) -> List[str]:
-    """Mantiene la logica originale: garantisce almeno una volta ogni proteina richiesta e completa il pool."""
-    proteine_richieste = [p for p, qta in frequenza.items() if qta > 0]
-    pool_finale = list(proteine_richieste)
+def genera_pool_proteine_dinamico(frequenza: Dict[str, int], totale_target: int) -> List[str]:
+    pool = []
+    for prot, qta in frequenza.items():
+        pool.extend([prot] * qta)
     
-    rimanenti_pool = []
-    for p, qta in frequenza.items():
-        istanze_extra = qta - 1
-        if istanze_extra > 0:
-            rimanenti_pool.extend([p] * istanze_extra)
-    
-    posti_da_riempire = totale_target - len(pool_finale)
-    if posti_da_riempire > 0:
-        k_da_estrarre = min(posti_da_riempire, len(rimanenti_pool))
-        extra_estratti = random.sample(rimanenti_pool, k=k_da_estrarre)
-        pool_finale.extend(extra_estratti)
-    
-    random.shuffle(pool_finale)
-    return pool_finale
+    proteine_chiave = list(frequenza.keys())
+    if not proteine_chiave:
+        proteine_chiave = ["legumi", "carne bianca", "carne rossa", "pesce", "uova", "latticini"]
 
-def seleziona_piatto_da_db(
-    proteina_target: str, 
-    vincolo_lavoro: bool, 
-    pool_piatti_db: List[PiattoDB],
-    piatti_gia_usati: List[int]
-) -> Optional[Piatto]:
-    """Seleziona un piatto dal database convertendolo nel modello Pydantic."""
-    # Filtro per proteina e duplicati
-    candidati = [p for p in pool_piatti_db if p.proteina == proteina_target and p.id not in piatti_gia_usati]
+    while len(pool) < totale_target:
+        pool.append(random.choice(proteine_chiave))
     
-    # Se finiti i piatti nuovi per quella proteina, ripeschiamo dai già usati
-    if not candidati:
-        candidati = [p for p in pool_piatti_db if p.proteina == proteina_target]
-
-    if vincolo_lavoro:
-        candidati_lavoro = [p for p in candidati if p.adatto_al_lavoro]
-        if candidati_lavoro:
-            candidati = candidati_lavoro
-
-    if not candidati:
-        return None
-        
-    scelto = random.choice(candidati)
-    return Piatto(
-        id=scelto.id,
-        nome=scelto.nome,
-        proteina=Proteina(scelto.proteina),
-        stagione=Stagione(scelto.stagione),
-        tempo=scelto.tempo,
-        adatto_al_lavoro=scelto.adatto_al_lavoro,
-        tipologia=Tipologia(scelto.tipologia)
-    )
+    random.shuffle(pool)
+    return pool[:totale_target]
 
 def genera_menu_ordinato(richiesta: Richiesta) -> Risposta:
-    db_session = SessionLocal()
+    db = SessionLocal()
     try:
-        # 1. CARICAMENTO REGOLE E PIATTI DAL DB
-        macro_db = db_session.query(MacroDB).all()
-        frequenza_ideale = {m.proteina: m.frequenza for m in macro_db}
+        macro = db.query(MacroDB).all()
+        frequenza_ideale = {m.proteina: m.frequenza for m in macro}
+        tutti_piatti = db.query(PiattoDB).all()
 
-        query = db_session.query(PiattoDB)
-        if richiesta.stagioni:
-            stagioni_val = [s.value for s in richiesta.stagioni]
-            query = query.filter(PiattoDB.stagione.in_(stagioni_val + ["generico"]))
-        
-        if richiesta.tempo_massimo:
-            query = query.filter(PiattoDB.tempo <= richiesta.tempo_massimo)
-        
-        db_filtrato = query.all()
-
-        # 2. GESTIONE PASTI BLOCCATI E CALCOLO RESIDUO
         pasti_bloccati = richiesta.pasti_bloccati or []
-        mappa_bloccati = {f"{pb.giorno}_{pb.momento}": pb.piatto for pb in pasti_bloccati}
+        mappa_pasti = {f"{pb.giorno}_{pb.momento}": pb.piatto for pb in pasti_bloccati}
         
         frequenza_residua = frequenza_ideale.copy()
-        piatti_usati_ids = []
-
         for pb in pasti_bloccati:
-            piatti_usati_ids.append(pb.piatto.id)
             prot = pb.piatto.proteina.value if hasattr(pb.piatto.proteina, 'value') else pb.piatto.proteina
             if prot in frequenza_residua:
                 frequenza_residua[prot] = max(0, frequenza_residua[prot] - 1)
 
-        # 3. GENERAZIONE POOL PROTEINE PER GLI SLOT VUOTI
         posti_liberi = 14 - len(pasti_bloccati)
-        pool_proteine = genera_pool_proteine_garantito(frequenza_residua, posti_liberi)
-        it_pool = iter(pool_proteine)
+        pool_proteine = genera_pool_proteine_dinamico(frequenza_residua, posti_liberi)
 
-        # 4. COSTRUZIONE SETTIMANA
-        risultati_giornalieri = {}
-        piatto_vuoto = Piatto(id=0, nome="Nessun match", tempo=0, adatto_al_lavoro=False)
-        ordine_giorni = ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato", "domenica"]
+        giorni_nomi = ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato", "domenica"]
+        # Normalizzazione giorni lavorativi senza accenti
+        giorni_lavorativi_nomi = [g.value.replace("ì", "i") for g in richiesta.giorni_lavorativi]
+        stagioni_richieste = [s.value for s in richiesta.stagioni] if richiesta.stagioni else []
 
-        for nome_giorno in ordine_giorni:
-            enum_giorno = Giorni_settimana[nome_giorno.upper()]
-            is_lavorativo = enum_giorno in richiesta.giorni_lavorativi
-            pasti_del_giorno = {"pranzo": [], "cena": []}
+        # 4. LOGICA "LAZY" - PRANZI LAVORATIVI A RITROSO
+        for i in range(4, -1, -1):
+            giorno_corr = giorni_nomi[i]
+            chiave_pranzo = f"{giorno_corr}_pranzo"
 
-            for momento in ["pranzo", "cena"]:
-                chiave = f"{nome_giorno}_{momento}"
+            if chiave_pranzo not in mappa_pasti and pool_proteine:
+                prot_scelta = random.choice(list(set(pool_proteine)))
                 
-                if chiave in mappa_bloccati:
-                    pasti_del_giorno[momento] = [mappa_bloccati[chiave]]
-                else:
-                    prot_target = next(it_pool, None)
-                    if prot_target:
-                        piatto = seleziona_piatto_da_db(
-                            prot_target, 
-                            (momento == "pranzo" and is_lavorativo), 
-                            db_filtrato, 
-                            piatti_usati_ids
-                        )
-                        if piatto:
-                            pasti_del_giorno[momento] = [piatto]
-                            piatti_usati_ids.append(piatto.id)
-                        else:
-                            pasti_del_giorno[momento] = [piatto_vuoto]
-                    else:
-                        pasti_del_giorno[momento] = [piatto_vuoto]
+                candidati = [p for p in tutti_piatti if 
+                            p.proteina == prot_scelta and
+                            (not stagioni_richieste or p.stagione in stagioni_richieste) and
+                            p.tempo <= richiesta.tempo_massimo and
+                            p.adatto_al_lavoro == True]
 
-            risultati_giornalieri[nome_giorno] = Pasti(
-                pranzo=pasti_del_giorno["pranzo"],
-                cena=pasti_del_giorno["cena"]
+                if candidati:
+                    piatto_db = random.choice(candidati)
+                    # Conversione sicura da DB a Pydantic
+                    piatto_pydantic = Piatto.model_validate(piatto_db)
+                    mappa_pasti[chiave_pranzo] = piatto_pydantic
+                    pool_proteine.remove(prot_scelta)
+
+                    # RIPETIZIONE (60%)
+                    if random.random() < 0.60 and prot_scelta in pool_proteine:
+                        ripetuto = False
+                        if i > 0:
+                            chiave_prec_p = f"{giorni_nomi[i-1]}_pranzo"
+                            if chiave_prec_p not in mappa_pasti:
+                                mappa_pasti[chiave_prec_p] = piatto_pydantic
+                                pool_proteine.remove(prot_scelta)
+                                ripetuto = True
+                        
+                        if not ripetuto and i > 0:
+                            chiave_prec_c = f"{giorni_nomi[i-1]}_cena"
+                            if chiave_prec_c not in mappa_pasti:
+                                mappa_pasti[chiave_prec_c] = piatto_pydantic
+                                pool_proteine.remove(prot_scelta)
+
+        # 5. RIEMPIMENTO RIMANENTI
+        for giorno in giorni_nomi:
+            for momento in ["pranzo", "cena"]:
+                chiave = f"{giorno}_{momento}"
+                if chiave not in mappa_pasti and pool_proteine:
+                    prot_scelta = random.choice(list(set(pool_proteine)))
+                    is_lavoro = (giorno in giorni_lavorativi_nomi and momento == "pranzo")
+                    
+                    candidati = [p for p in tutti_piatti if 
+                                p.proteina == prot_scelta and
+                                (not stagioni_richieste or p.stagione in stagioni_richieste) and
+                                p.tempo <= richiesta.tempo_massimo and
+                                (not is_lavoro or p.adatto_al_lavoro == True)]
+                    
+                    if candidati:
+                        p_db = random.choice(candidati)
+                        mappa_pasti[chiave] = Piatto.model_validate(p_db)
+                        pool_proteine.remove(prot_scelta)
+                    else:
+                        mappa_pasti[chiave] = Piatto(id=999, nome=f"Manca {prot_scelta}", tempo=0, adatto_al_lavoro=False)
+
+        # 6. COSTRUZIONE RISPOSTA
+        pasti_sett = {}
+        for g in giorni_nomi:
+            pasti_sett[g] = Pasti(
+                pranzo=[mappa_pasti.get(f"{g}_pranzo")] if mappa_pasti.get(f"{g}_pranzo") else [],
+                cena=[mappa_pasti.get(f"{g}_cena")] if mappa_pasti.get(f"{g}_cena") else []
             )
 
-        # 5. RISPOSTA FINALE
-        dt_inizio = richiesta.data_inizio_settimana or date.today()
-        giorno_sett_inizio = list(Giorni_settimana)[dt_inizio.weekday()]
-
         return Risposta(
-            giorno_inizio_settimana=giorno_sett_inizio,
-            data_inizio_settimana=dt_inizio,
-            tabella=Pasti_settimana(**risultati_giornalieri)
+            data_inizio_settimana=richiesta.data_inizio_settimana or date.today(),
+            tabella=Pasti_settimana(**pasti_sett)
         )
     finally:
-        db_session.close()
+        db.close()
 
-def salva_menu_settimanale(richiesta: Risposta) -> bool:
+def salva_menu_settimanale(risposta: Risposta) -> bool:
     db_session = SessionLocal()
     try:
-        # 1. Controlliamo se esiste già una settimana per questa data
-        settimana_esistente = db_session.query(SettimanaDB).filter(
-            SettimanaDB.data_inizio == richiesta.data_inizio_settimana
+        settimana = db_session.query(SettimanaDB).filter(
+            SettimanaDB.data_inizio == risposta.data_inizio_settimana
         ).first()
 
-        if settimana_esistente:
-            # Sovrascrittura: cancelliamo i pasti esistenti legati a questa settimana
-            db_session.query(PastoSalvatoDB).filter(
-                PastoSalvatoDB.settimana_id == settimana_esistente.id
-            ).delete()
-            nuova_settimana = settimana_esistente
+        if settimana:
+            db_session.query(PastoSalvatoDB).filter(PastoSalvatoDB.settimana_id == settimana.id).delete()
         else:
-            # Creazione nuova
-            nuova_settimana = SettimanaDB(data_inizio=richiesta.data_inizio_settimana)
-            db_session.add(nuova_settimana)
-            db_session.flush() # Otteniamo l'ID
+            settimana = SettimanaDB(data_inizio=risposta.data_inizio_settimana)
+            db_session.add(settimana)
+            db_session.flush()
 
-        # 2. Salvataggio dei pasti della tabella
-        tabella = richiesta.tabella
         giorni = ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato", "domenica"]
-        
-        for giorno in giorni:
-            pasti_giorno = getattr(tabella, giorno)
-            for momento in ["pranzo", "cena"]:
-                lista_piatti = getattr(pasti_giorno, momento)
-                for p in lista_piatti:
-                    # Se il piatto ha ID 999 è un inserimento manuale, salviamo il nome
-                    nuovo_pasto = PastoSalvatoDB(
-                        settimana_id=nuova_settimana.id,
-                        giorno=giorno,
-                        momento=momento,
-                        piatto_id=p.id if p.id != 999 else None,
-                        nome_manuale=p.nome if p.id == 999 else None
-                    )
-                    db_session.add(nuovo_pasto)
-        
+        for g in giorni:
+            pasti_giorno = getattr(risposta.tabella, g)
+            for m in ["pranzo", "cena"]:
+                lista = getattr(pasti_giorno, m)
+                for p in lista:
+                    if p:
+                        db_session.add(PastoSalvatoDB(
+                            settimana_id=settimana.id,
+                            giorno=g,
+                            momento=m,
+                            piatto_id=p.id if p.id != 999 else None,
+                            nome_manuale=p.nome if p.id == 999 else None
+                        ))
         db_session.commit()
         return True
     except Exception as e:
-        print(f"Errore durante il salvataggio: {e}")
         db_session.rollback()
+        print(f"Errore salvataggio: {e}")
         return False
     finally:
         db_session.close()

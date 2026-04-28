@@ -13,5 +13,5 @@ class Piatto(BaseModel):
     tempo : int
     adatto_al_lavoro : bool
     tipologia : Tipologia = Tipologia.UNICO
-
+    model_config = {"from_attributes": True}
     

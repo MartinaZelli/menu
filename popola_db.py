@@ -23,17 +23,20 @@ SessionOverride = sessionmaker(autocommit=False, autoflush=False, bind=engine_lo
 def popola():
     print("Inizializzazione database via Localhost...")
     
-    # Crea le tabelle se non esistono
+    # 1. CANCELLAZIONE TOTALE
+    # Questo elimina fisicamente tutte le tabelle definite in 'Base' dal database
+    print("Eliminazione di tutte le tabelle esistenti...")
+    Base.metadata.drop_all(bind=engine_local)
+    
+    # 2. RICREAZIONE SCHEMA
+    # Crea nuovamente le tabelle vuote basandosi sui modelli SQLAlchemy
+    print("Ricreazione schema database...")
     Base.metadata.create_all(bind=engine_local)
     
     db = SessionOverride()
     
     try:
-        print("Pulizia tabelle esistenti...")
-        db.query(PiattoDB).delete()
-        db.query(MacroDB).delete()
-        db.commit()
-
+        
         # --- 2. IMPORTA MACRO ---
         print("Importazione frequenze macro...")
         frequenze = [
