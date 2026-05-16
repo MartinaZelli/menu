@@ -1,10 +1,20 @@
-FROM python:3.15.0a7-alpine3.22
-RUN apk add g++ libffi-dev mariadb-dev
-RUN mkdir /app
-ADD requirements.txt /app
-RUN pip install -r /app/requirements.txt
-ADD src /app/src
-ADD static /app/static
-ADD main.py /app
+FROM python:3.12-alpine3.20
+RUN apk add --no-cache \
+    g++ \
+    libffi-dev \
+    mariadb-dev \
+    gcc \
+    musl-dev \
+    mariadb-connector-c-dev
+
 WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY src/ ./src/
+COPY static/ ./static/
+COPY main.py .
+COPY popola_db.py .
+
 CMD ["python3","/app/main.py"]

@@ -1,64 +1,84 @@
 import sys
 import os
-from sqlalchemy import create_engine
+import time
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-# 1. Aggiunta del percorso per trovare i moduli dell'app
-sys.path.append(os.path.join(os.getcwd(), "docker", "app"))
+# 1. Configurazione del percorso
+# All'interno del container, se WORKDIR è /app, lo script vede già la cartella 'src'
+sys.path.append(os.getcwd())
 
 try:
     # Importiamo le classi e le enumerazioni dai file del progetto
     from src.database import Base, PiattoDB, MacroDB
     from src.enums import Proteina, Stagione, Tipologia
 except ImportError as e:
-    print(f"Errore: Non riesco a trovare i moduli in docker/app/src. Dettaglio: {e}")
+    print(f"Errore: Non riesco a trovare i moduli nella cartella 'src'. Dettaglio: {e}")
     sys.exit(1)
 
-# --- CONFIGURAZIONE OVERRIDE PER ESECUZIONE DA PC ---
-LOCAL_DATABASE_URL = "mysql+pymysql://menu:menu@localhost:3306/menu_progetto"
+# --- CONFIGURAZIONE PER ESECUZIONE DENTRO DOCKER ---
+# Usiamo 'db' come host perché è il nome del servizio definito nel docker-compose
+DB_USER = "menu"
+DB_PASS = "menu"
+DB_HOST = "db"
+DB_NAME = "menu_progetto"
 
-engine_local = create_engine(LOCAL_DATABASE_URL)
-SessionOverride = sessionmaker(autocommit=False, autoflush=False, bind=engine_local)
+DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}:3306/{DB_NAME}"
+
+# Configurazione Engine
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def popola():
-    print("Inizializzazione database via Localhost...")
-    
-    # 1. CANCELLAZIONE TOTALE
-    # Questo elimina fisicamente tutte le tabelle definite in 'Base' dal database
-    print("Eliminazione di tutte le tabelle esistenti...")
-    Base.metadata.drop_all(bind=engine_local)
-    
-    # 2. RICREAZIONE SCHEMA
-    # Crea nuovamente le tabelle vuote basandosi sui modelli SQLAlchemy
-    print("Ricreazione schema database...")
-    Base.metadata.create_all(bind=engine_local)
-    
-    db = SessionOverride()
-    
+    print(f"Inizializzazione database su host: {DB_HOST}...")
+
+    # Tentativi di connessione (il DB potrebbe impiegare tempo per avviarsi)
+    db_connesso = False
+    for i in range(10):
+        try:
+            with engine.connect() as connection:
+                print("Connessione stabilita.")
+                db_connesso = True
+                break
+        except Exception:
+            print(f"Tentativo {i+1}: DB non pronto, attesa...")
+            time.sleep(5)
+
+    if not db_connesso:
+        sys.exit(1)
+
+    # 1. ASSICURA CHE LE TABELLE ESISTANO (senza cancellarle)
+    Base.metadata.create_all(bind=engine)
+
+    db = SessionLocal()
+
     try:
-        
-        # --- 2. IMPORTA MACRO ---
-        print("Importazione frequenze macro...")
-        frequenze = [
-            MacroDB(proteina=Proteina.LEGUMI.value, frequenza=3),
-            MacroDB(proteina=Proteina.LATTICINI.value, frequenza=4),
-            MacroDB(proteina=Proteina.CARNE_BIANCA.value, frequenza=4),
-            MacroDB(proteina=Proteina.CARNE_ROSSA.value, frequenza=1),
-            MacroDB(proteina=Proteina.PESCE.value, frequenza=3),
-            MacroDB(proteina=Proteina.UOVA.value, frequenza=3),
+        # --- 2. AGGIORNAMENTO MACRO ---
+        print("Controllo frequenze macro...")
+        macro_predefinite = [
+            {"proteina": Proteina.LEGUMI.value, "frequenza": 3},
+            {"proteina": Proteina.LATTICINI.value, "frequenza": 4},
+            {"proteina": Proteina.CARNE_BIANCA.value, "frequenza": 4},
+            {"proteina": Proteina.CARNE_ROSSA.value, "frequenza": 1},
+            {"proteina": Proteina.PESCE.value, "frequenza": 3},
+            {"proteina": Proteina.UOVA.value, "frequenza": 3},
         ]
-        db.add_all(frequenze)
+
+        for m_data in macro_predefinite:
+            esistente = db.execute(select(MacroDB).filter_by(proteina=m_data["proteina"])).scalar_one_or_none()
+            if not esistente:
+                db.add(MacroDB(**m_data))
 
         # --- 3. IMPORTA PIATTI ---
-        print("Importazione ricettario...")
-        lista_piatti = [
+        print("Controllo ricettario...")
+        piatti_base = [
             # LATTICINI
             PiattoDB(nome="Pasta al pomodoro e mozzarella", tempo=30, adatto_al_lavoro=False, proteina=Proteina.LATTICINI.value, tipologia=Tipologia.PRIMO.value, stagione=Stagione.GENERICO.value),
             PiattoDB(nome="Tomino alla piastra", tempo=5, adatto_al_lavoro=True, proteina=Proteina.LATTICINI.value, tipologia=Tipologia.SECONDO.value, stagione=Stagione.GENERICO.value),
             PiattoDB(nome="Insalata greca", tempo=10, adatto_al_lavoro=True, proteina=Proteina.LATTICINI.value, tipologia=Tipologia.UNICO.value, stagione=Stagione.ESTATE.value),
             PiattoDB(nome="Gnocchi al gorgonzola", tempo=15, adatto_al_lavoro=False, proteina=Proteina.LATTICINI.value, tipologia=Tipologia.PRIMO.value, stagione=Stagione.INVERNO.value),
             PiattoDB(nome="Pasta fredda tricolore", tempo=20, adatto_al_lavoro=True, proteina=Proteina.LATTICINI.value, tipologia=Tipologia.PRIMO.value, stagione=Stagione.ESTATE.value),
-            PiattoDB(nome="Ricotta fresca e mieie", tempo=5, adatto_al_lavoro=True, proteina=Proteina.LATTICINI.value, tipologia=Tipologia.SECONDO.value, stagione=Stagione.ESTATE.value),
+            PiattoDB(nome="Ricotta fresca e miele", tempo=5, adatto_al_lavoro=True, proteina=Proteina.LATTICINI.value, tipologia=Tipologia.SECONDO.value, stagione=Stagione.ESTATE.value),
 
             # LEGUMI
             PiattoDB(nome="Minestrone di verdure", tempo=40, adatto_al_lavoro=False, proteina=Proteina.LEGUMI.value, tipologia=Tipologia.PRIMO.value, stagione=Stagione.INVERNO.value),
@@ -93,7 +113,6 @@ def popola():
             PiattoDB(nome="Baccalà alla livornese", tempo=40, adatto_al_lavoro=False, proteina=Proteina.PESCE.value, tipologia=Tipologia.SECONDO.value, stagione=Stagione.GENERICO.value),
             PiattoDB(nome="Branzino al sale", tempo=35, adatto_al_lavoro=False, proteina=Proteina.PESCE.value, tipologia=Tipologia.SECONDO.value, stagione=Stagione.GENERICO.value),
             PiattoDB(nome="Cous cous di pesce", tempo=30, adatto_al_lavoro=True, proteina=Proteina.PESCE.value, tipologia=Tipologia.UNICO.value, stagione=Stagione.ESTATE.value),
-            # CORREZIONE QUI: Tipologia.SECONDO invece di Tipologia.MEZZA
             PiattoDB(nome="Sogliola alla mugnaia", tempo=10, adatto_al_lavoro=True, proteina=Proteina.PESCE.value, tipologia=Tipologia.SECONDO.value, stagione=Stagione.MEZZA.value),
             PiattoDB(nome="Zuppa di pesce", tempo=50, adatto_al_lavoro=False, proteina=Proteina.PESCE.value, tipologia=Tipologia.UNICO.value, stagione=Stagione.INVERNO.value),
             PiattoDB(nome="Filetto di orata al forno", tempo=20, adatto_al_lavoro=False, proteina=Proteina.PESCE.value, tipologia=Tipologia.SECONDO.value, stagione=Stagione.GENERICO.value),
@@ -107,10 +126,17 @@ def popola():
             PiattoDB(nome="Frittata al forno con verdure", tempo=25, adatto_al_lavoro=True, proteina=Proteina.UOVA.value, tipologia=Tipologia.SECONDO.value, stagione=Stagione.GENERICO.value),
             PiattoDB(nome="Uova alla coque con crostini", tempo=8, adatto_al_lavoro=False, proteina=Proteina.UOVA.value, tipologia=Tipologia.SECONDO.value, stagione=Stagione.GENERICO.value),
         ]
-        
-        db.add_all(lista_piatti)
+
+        nuovi_inseriti = 0
+        for piatto in piatti_base:
+            # Controlla se esiste già un piatto con lo stesso nome
+            esistente = db.execute(select(PiattoDB).filter_by(nome=piatto.nome)).scalar_one_or_none()
+            if not esistente:
+                db.add(piatto)
+                nuovi_inseriti += 1
+
         db.commit()
-        print(f"Completato! Caricati {len(lista_piatti)} piatti.")
+        print(f"Operazione completata. Nuovi piatti aggiunti: {nuovi_inseriti}.")
 
     except Exception as e:
         print(f"Errore durante il popolamento: {e}")
