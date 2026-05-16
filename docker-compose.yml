@@ -1,6 +1,7 @@
 services:
   app:
    # image: menu_app:latest
+    restart: always
     build:
       context: .
       dockerfile: Dockerfile
@@ -12,6 +13,7 @@ services:
       - db
 
   db:
+    restart: always
     image: mysql:8.0
     environment:
       # Password per l'utente root (obbligatoria per il container)
