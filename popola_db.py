@@ -1,19 +1,19 @@
 import sys
-import os
 import time
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from pathlib import Path
 
-percorso_superiore = Path.cwd().parent
-sys.path.append(str(percorso_superiore))
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
 
 try:
     # Importiamo le classi e le enumerazioni dai file del progetto
     from src.database import Base, PiattoDB, MacroDB
     from src.enums import Proteina, Stagione, Tipologia
 except ImportError as e:
-    print(f"Errore: Non riesco a trovare i moduli in docker/app/src. Dettaglio: {e}")
+    print(f"Errore: Non riesco a trovare i moduli. Dettaglio: {e}")
     sys.exit(1)
 
 # --- CONFIGURAZIONE OVERRIDE PER ESECUZIONE DA PC ---
