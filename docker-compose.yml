@@ -1,6 +1,7 @@
 services:
   app:
    # image: menu_app:latest
+    container_name: menu_app_container
     build:
       context: ./docker/app
       dockerfile: Dockerfile
@@ -36,7 +37,7 @@ services:
 
 volumes:
   db_data:
-  
+
 networks:
   menu-network:
     driver: bridge
