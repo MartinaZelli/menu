@@ -15,6 +15,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 COPY static/ ./static/
 COPY main.py .
-COPY popola_db/popola_db.py .
 
 CMD ["python3","/app/main.py"]
