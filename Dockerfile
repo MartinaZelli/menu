@@ -13,5 +13,8 @@ RUN pip install -r /app/requirements.txt
 ADD src /app/src
 ADD static /app/static
 ADD main.py /app
+RUN mkdir /app/popola_db
+ADD popola_db.py /app/popola_db
 WORKDIR /app
-CMD ["python3","/app/main.py"]
+CMD ["python3", "/app/popola_db/popola_db.py", "python3", "/app/main.py"]
+

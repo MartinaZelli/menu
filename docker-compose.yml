@@ -2,7 +2,7 @@ services:
   app:
    # image: menu_app:latest
     build:
-      context: ./docker/app
+      context: .
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
