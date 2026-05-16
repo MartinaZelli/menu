@@ -3,9 +3,10 @@ import os
 import time
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from pathlib import Path
 
-# 1. Aggiunta del percorso per trovare i moduli dell'app
-sys.path.append(os.path.join(os.getcwd(), "docker", "app"))
+percorso_superiore = Path.cwd().parent
+sys.path.append(str(percorso_superiore))
 
 try:
     # Importiamo le classi e le enumerazioni dai file del progetto
