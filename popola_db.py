@@ -5,8 +5,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 # 1. Configurazione del percorso
-# All'interno del container, se WORKDIR è /app, lo script vede già la cartella 'src'
-sys.path.append(os.getcwd())
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
 try:
     # Importiamo le classi e le enumerazioni dai file del progetto
