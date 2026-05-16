@@ -7,13 +7,11 @@ RUN apk add --no-cache \
     musl-dev \
     mariadb-connector-c-dev
 
+RUN mkdir /app
+ADD requirements.txt /app
+RUN pip install -r /app/requirements.txt
+ADD src /app/src
+ADD static /app/static
+ADD main.py /app
 WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY src/ ./src/
-COPY static/ ./static/
-COPY main.py .
-
 CMD ["python3","/app/main.py"]
