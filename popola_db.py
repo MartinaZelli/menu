@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -22,6 +23,20 @@ SessionOverride = sessionmaker(autocommit=False, autoflush=False, bind=engine_lo
 
 def popola():
     print("Inizializzazione database via Localhost...")
+
+    db_connesso = False
+    for i in range(10):
+        try:
+            with engine_local.connect() as connection:
+                print("Connessione stabilita.")
+                db_connesso = True
+                break
+        except Exception:
+            print(f"Tentativo {i+1}: DB non pronto, attesa...")
+            time.sleep(5)
+
+    if not db_connesso:
+        sys.exit(1)
 
     # 1. CANCELLAZIONE TOTALE
     # Questo elimina fisicamente tutte le tabelle definite in 'Base' dal database
