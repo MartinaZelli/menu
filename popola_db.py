@@ -17,7 +17,7 @@ except ImportError as e:
     sys.exit(1)
 
 # --- CONFIGURAZIONE OVERRIDE PER ESECUZIONE DA PC ---
-LOCAL_DATABASE_URL = "mysql+pymysql://menu:menu@localhost:3306/menu_progetto"
+LOCAL_DATABASE_URL = "mysql+pymysql://menu:menu@db:3306/menu_progetto"
 
 engine_local = create_engine(LOCAL_DATABASE_URL)
 SessionOverride = sessionmaker(autocommit=False, autoflush=False, bind=engine_local)
