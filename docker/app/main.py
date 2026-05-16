@@ -14,7 +14,7 @@ app.add_middleware(
     allow_headers=["*"],  # Permette tutti gli header
 )
 app.include_router(router.router)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/", StaticFiles(directory="static"), name="static")
 
 def main():
     uvicorn.run(app, host="0.0.0.0", port=8000)
